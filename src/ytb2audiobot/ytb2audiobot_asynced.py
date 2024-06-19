@@ -1,6 +1,5 @@
 import argparse
 import asyncio
-import datetime
 import logging
 import re
 import sys
@@ -15,18 +14,18 @@ from urlextract import URLExtract
 from ytb2audio.ytb2audio import get_youtube_move_id
 import os
 import pathlib
-import time
-from io import BytesIO
-from string import Template
 from audio2splitted.audio2splitted import get_split_audio_scheme, make_split_audio, DURATION_MINUTES_MIN, \
     DURATION_MINUTES_MAX
 from dotenv import load_dotenv
 from telegram.constants import ParseMode
 from mutagen.mp4 import MP4
 from utils4audio.duration import get_duration_asynced
-from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled
+
 from ytb2audio.ytb2audio import download_audio, download_thumbnail, YT_DLP_OPTIONS_DEFAULT
 from datetime import timedelta
+
+from ytb2audiobot.subtitles import get_subtitles
+from ytb2audiobot.ytb2audiobot_asynced import get_timecodes_text
 
 # All handlers should be attached to the Router (or Dispatcher)
 
@@ -41,7 +40,7 @@ DATA_DIR = '../../data'
 
 keepfiles = False
 
-TIMECODES_THRESHOLD_COUNT = 3
+
 SEND_AUDIO_TIMEOUT = 120
 TELEGRAM_CAPTION_TEXT_LONG_MAX = 1024-8
 
@@ -110,123 +109,19 @@ def output_filename_in_telegram(text):
     return f'{name}.m4a'
 
 
-def clean_timecodes_text(text):
-    text = (text
-            .replace('---', '')
-            .replace('--', '')
-            .replace('===', '')
-            .replace('==', '')
-            .replace(' =', '')
-            .replace('___', '')
-            .replace('__', '')
-            .replace('_ _ _', '')
-            .replace('_ _', '')
-            .replace(' _', '')
-            .replace('\n-', '')
-            .replace('\n=', '')
-            .replace('\n_', '')
-            .replace('\n -', '')
-            .replace('\n =', '')
-            .replace('\n _', '')
-            .strip()
-            .lstrip()
-            .rstrip()
-            )
-    return text
 
 
-def filter_timestamp_format(_time):
-    _time = str(_time)
-    if _time == '0:00':
-        return '0:00'
-
-    if _time == '00:00':
-        return '0:00'
-
-    if _time == '0:00:00':
-        return '0:00'
-
-    if _time == '00:00:00':
-        return '0:00'
-
-    if _time.startswith('00:00:0'):
-        return _time.replace('00:00:0', '0:0')
-
-    if _time.startswith('0:00:0'):
-        return _time.replace('0:00:0', '0:0')
-
-    if _time.startswith('00:00:'):
-        return _time.replace('00:00:', '0:')
-
-    if _time.startswith('0:00:'):
-        return _time.replace('0:00:', '0:')
-
-    _time = f'@@{_time}##'
-    _time = _time.replace('@@00:00:0', '@@0:0')
-    _time = _time.replace('@@0:0', '@@')
-    _time = _time.replace('@@0:', '@@')
-
-    return _time.replace('@@', '').replace('##', '')
 
 
-def time_to_seconds(time_str):
-    if time_str.count(':') == 1:
-        format_str = '%M:%S'
-        time_obj = datetime.datetime.strptime(time_str, format_str)
-        total_seconds = time_obj.minute * 60 + time_obj.second
-    elif time_str.count(':') == 2:
-        format_str = '%H:%M:%S'
-        time_obj = datetime.datetime.strptime(time_str, format_str)
-        total_seconds = time_obj.hour * 3600 + time_obj.minute * 60 + time_obj.second
-    else:
-        raise ValueError("Time format not recognized")
-    return total_seconds
 
 
-def get_timestamps_group(text, scheme):
-    timestamps_findall_results = re.findall(r'(\d*:?\d+:\d+)\s+(.+)', text)
-    if not timestamps_findall_results:
-        return ['' for part in range(len(scheme))]
-
-    timestamps_all = [{'time': time_to_seconds(stamp[0]), 'title': stamp[1]} for stamp in timestamps_findall_results]
-
-    timestamps_group = []
-    for idx, part in enumerate(scheme):
-        output_rows = []
-        for stamp in timestamps_all:
-            if stamp.get('time') < part[0] or part[1] < stamp.get('time'):
-                continue
-            time = filter_timestamp_format(timedelta(seconds=stamp.get('time') - part[0]))
-            title = capital2lower_letters_filter(stamp.get('title'))
-            output_rows.append(f'{time} - {title}')
-        timestamps_group.append('\n'.join(output_rows))
-
-    return timestamps_group
 
 
-def get_timecodes_text(description):
-    if not description:
-        return
-    if type(description) is not list:
-        return
-    if len(description) < 1:
-        return ''
-
-    for part in description[0].split('\n\n'):
-        matches = re.compile(r'(\d{1,2}:\d{2})').findall(part)
-        if len(matches) > TIMECODES_THRESHOLD_COUNT:
-            return clean_timecodes_text(part)
 
 
-def capital2lower_letters_filter(text):
-    CAPITAL_LETTERS_PERCENT_THRESHOLD = 0.3
-    count_capital = sum(1 for char in text if char.isupper())
-    if count_capital / len(text) < CAPITAL_LETTERS_PERCENT_THRESHOLD:
-        return text
 
-    text = text.lower()
-    text = text[0].upper() + text[1:]
-    return text
+
+
 
 
 async def get_data_dir():
@@ -247,88 +142,7 @@ async def get_mp4_oject(path: pathlib.Path):
     return mp4object, ''
 
 
-def get_answer_text(subtitles, selected_index=None):
-    if selected_index is None:
-        selected_index = []
-    if not selected_index:
-        selected_index = list(range(len(subtitles)))
-    output_text = ''
-    index_last = None
-    for index_item in selected_index:
-        if index_last and index_item - index_last > 1:
-            output_text += '...\n\n'
-
-        subtitle_time = time.strftime('%H:%M:%S', time.gmtime(int(subtitles[index_item]['start'])))
-        subtitle_text = subtitles[index_item]['text']
-
-        output_text += f'{subtitle_time} {subtitle_text}\n'
-
-        index_last = index_item
-
-    return output_text
-
-
-def get_discovered_subtitles_index(subtitles, discovered_word):
-    discovered_rows = set()
-    for idx, sub in enumerate(subtitles):
-        text = sub['text'].lower()
-        text = f' {text} '
-        res_find = text.find(discovered_word)
-        if res_find > 0:
-            discovered_rows.add(idx)
-
-    return discovered_rows
-
-
-def extend_discovered_index(discovered_index, max_length, count_addition_index=1):
-    for row in discovered_index.copy():
-        for row_add in list(range(row-count_addition_index, row+count_addition_index+1)):
-            if 0 <= row_add <= max_length-1:
-                discovered_index.add(row_add)
-
-    return sorted(discovered_index)
-
-
-IS_TEXT_FORMATTED = True
-
-FORMAT_TEMPLATE = Template('<b><s>$text</s></b>')
-
-ADDITION_ROWS_NUMBER = 1
-
 MAX_TELEGRAM_BOT_TEXT_SIZE = 4095
-
-
-def format_text(text, target):
-    if IS_TEXT_FORMATTED:
-        text = text.replace(target, FORMAT_TEMPLATE.substitute(text=target))
-        text = text.replace(target.capitalize(), FORMAT_TEMPLATE.substitute(text=target.capitalize()))
-        text = text.replace(target.upper(), FORMAT_TEMPLATE.substitute(text=target.upper()))
-        text = text.replace(target.lower(), FORMAT_TEMPLATE.substitute(text=target.lower()))
-    return text
-
-
-async def get_subtitles(movie_id: str, discovered_word: str = ''):
-    try:
-        subtitles = YouTubeTranscriptApi.get_transcript(movie_id, languages=['ru'])
-    except TranscriptsDisabled:
-        return '', '⛔️ YouTubeTranscriptApi: TranscriptsDisabled'
-    except (ValueError, Exception):
-        return '', '⛔️ Undefined problem in YouTubeTranscriptApi'
-
-    if not discovered_word:
-        text = get_answer_text(subtitles)
-        return text, ''
-
-    if not (discovered_index := get_discovered_subtitles_index(subtitles, discovered_word)):
-        return 'Nothing Found :)', ''
-
-    discovered_index = extend_discovered_index(discovered_index, len(subtitles), ADDITION_ROWS_NUMBER)
-
-    text = get_answer_text(subtitles, discovered_index)
-
-    text = format_text(text, discovered_word)
-
-    return text, ''
 
 
 async def delete_files(data_dir, movie_id):
@@ -613,7 +427,11 @@ async def message_parser(message: Message) -> None:
     await asyncio.create_task(processing_commands(message, command_context, sender_id))
 
 
-async def main() -> None:
+async def start_bot():
+    await dp.start_polling(bot)
+
+
+def main():
     parser = argparse.ArgumentParser(description='Bot ytb 2 audio')
     parser.add_argument('--keepfiles', type=int,
                         help='Keep raw files 1=True, 0=False (default)', default=0)
@@ -623,10 +441,11 @@ async def main() -> None:
     if args.keepfiles=='1':
         keepfiles = True
 
-    await dp.start_polling(bot)
+    asyncio.run(start_bot())
 
 
 if __name__ == "__main__":
     print('😄 Start')
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-    asyncio.run(main())
+    main()
+
