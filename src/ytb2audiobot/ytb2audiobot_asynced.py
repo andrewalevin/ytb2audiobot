@@ -3,31 +3,31 @@ import asyncio
 import logging
 import re
 import sys
-import aiofiles.os
-from PIL import Image
 from aiogram import Bot, Dispatcher, html
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart
 from aiogram.types import Message, FSInputFile, BufferedInputFile
-from urlextract import URLExtract
-from ytb2audio.ytb2audio import get_youtube_move_id
 import os
 import pathlib
-from audio2splitted.audio2splitted import get_split_audio_scheme, make_split_audio, DURATION_MINUTES_MIN, \
-    DURATION_MINUTES_MAX
 from dotenv import load_dotenv
 from telegram.constants import ParseMode
 from mutagen.mp4 import MP4
-from utils4audio.duration import get_duration_asynced
-
-from ytb2audio.ytb2audio import download_audio, download_thumbnail, YT_DLP_OPTIONS_DEFAULT
 from datetime import timedelta
 
-from ytb2audiobot.subtitles import get_subtitles
-from ytb2audiobot.ytb2audiobot_asynced import get_timecodes_text
+from utils4audio.duration import get_duration_asynced
+from ytb2audio.ytb2audio import download_audio, download_thumbnail, YT_DLP_OPTIONS_DEFAULT, get_youtube_move_id
+from audio2splitted.audio2splitted import get_split_audio_scheme, make_split_audio, DURATION_MINUTES_MIN, \
+    DURATION_MINUTES_MAX
 
-# All handlers should be attached to the Router (or Dispatcher)
+from ytb2audiobot.subtitles import get_subtitles
+from ytb2audiobot.commands import get_command_params_of_request
+from ytb2audiobot.thumbnail import image_compress_and_resize
+from ytb2audiobot.timecodes import capital2lower_letters_filter, get_timecodes_text, get_timestamps_group, \
+    filter_timestamp_format
+from ytb2audiobot.utils import delete_file_async, create_directory_async
+
+from ytb2audiobot.timecodes import get_timecodes
 
 dp = Dispatcher()
 
@@ -38,45 +38,10 @@ bot = Bot(token=token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
 DATA_DIR = '../../data'
 
-keepfiles = False
-
+keepfiles_global = False
 
 SEND_AUDIO_TIMEOUT = 120
 TELEGRAM_CAPTION_TEXT_LONG_MAX = 1024-8
-
-COMMANDS_SPLIT = [
-    {'name': 'split', 'alias': 'split'},
-    {'name': 'split', 'alias': 'spl'},
-    {'name': 'split', 'alias': 'sp'},
-]
-
-COMMANDS_BITRATE = [
-    {'name': 'bitrate', 'alias': 'bitrate'},
-    {'name': 'bitrate', 'alias': 'bitr'},
-    {'name': 'bitrate', 'alias': 'bit'},
-]
-
-COMMANDS_SUBTITLES = [
-    {'name': 'subtitles', 'alias': 'subtitles'},
-    {'name': 'subtitles', 'alias': 'subt'},
-    {'name': 'subtitles', 'alias': 'subs'},
-    {'name': 'subtitles', 'alias': 'sub'},
-    {'name': 'subtitles', 'alias': 'su'},
-]
-
-COMMANDS_FORCE_DOWNLOAD = [
-    {'name': 'download', 'alias': 'download'},
-    {'name': 'download', 'alias': 'down'},
-    {'name': 'download', 'alias': 'dow'},
-    {'name': 'download', 'alias': 'd'},
-    {'name': 'download', 'alias': 'bot'},
-    {'name': 'download', 'alias': 'скачать'},
-    {'name': 'download', 'alias': 'скач'},
-    {'name': 'download', 'alias': 'ск'},
-]
-
-
-ALL_COMMANDS = COMMANDS_SPLIT + COMMANDS_BITRATE + COMMANDS_SUBTITLES + COMMANDS_FORCE_DOWNLOAD
 
 AUDIO_SPLIT_THRESHOLD_MINUTES = 120
 AUDIO_SPLIT_DELTA_SECONDS = 5
@@ -84,19 +49,9 @@ AUDIO_SPLIT_DELTA_SECONDS = 5
 AUDIO_BITRATE_MIN = 48
 AUDIO_BITRATE_MAX = 320
 
+MAX_TELEGRAM_BOT_TEXT_SIZE = 4095
 
-async def image_compress_and_resize(
-        path: pathlib.Path,
-        output: pathlib.Path = None,
-        quality: int = 80,
-        thumbnail_size=(960, 960)
-):
-    image = Image.open(path)
-    image.thumbnail(thumbnail_size)
-    if not output:
-        output = path
-    image.save(output, optimize=True, quality=quality)
-    return output
+TASK_TIMEOUT_SECONDS = 60 * 30
 
 
 def output_filename_in_telegram(text):
@@ -109,30 +64,7 @@ def output_filename_in_telegram(text):
     return f'{name}.m4a'
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-async def get_data_dir():
-    data_dir = pathlib.Path(DATA_DIR)
-    if not data_dir.exists():
-        await aiofiles.os.mkdir(data_dir.as_posix())
-
-    return data_dir
-
-
-async def get_mp4_oject(path: pathlib.Path):
+async def get_mp4object(path: pathlib.Path):
     path = pathlib.Path(path)
     try:
         mp4object = MP4(path.as_posix())
@@ -142,14 +74,27 @@ async def get_mp4_oject(path: pathlib.Path):
     return mp4object, ''
 
 
-MAX_TELEGRAM_BOT_TEXT_SIZE = 4095
+async def get_data_dir():
+    data_dir = pathlib.Path(DATA_DIR)
+    return await create_directory_async(data_dir)
 
 
-async def delete_files(data_dir, movie_id):
-    files = list(filter(lambda f: (f.name.startswith(movie_id)), data_dir.iterdir()))
-    for f in files:
-        f.unlink()
+async def delete_files_by_movie_id(data_dir, movie_id):
+    for file in list(filter(lambda file: (file.name.startswith(movie_id)), data_dir.iterdir())):
+        await delete_file_async(file)
 
+
+def get_title(mp4obj, movie_id):
+    title = str(movie_id)
+    if mp4obj.get('\xa9nam'):
+        title = mp4obj.get('\xa9nam')[0]
+
+    return capital2lower_letters_filter(title)
+
+
+def get_youtube_link_html(movie_id):
+    url_youtube = f'youtu.be/{movie_id}'
+    return f'<a href=\"{url_youtube}\">{url_youtube}</a>'
 
 async def processing_commands(message: Message, command: dict, sender_id):
     post_status = await message.reply(f'⌛️ Starting ... ')
@@ -263,40 +208,37 @@ async def processing_commands(message: Message, command: dict, sender_id):
         output_folder=data_dir,
         scheme=scheme
     )
-
     await post_status.edit_text('⌛ Uploading to Telegram ... ')
 
-    audio_mp4obj, _err = await get_mp4_oject(audio)
+    mp4obj, _err = await get_mp4object(audio)
     if _err:
         await post_status.edit_text(f'🟥 Exception as e: [m4a = MP4(m4a_file.as_posix())]. \n\n{_err}')
 
-    if not audio_mp4obj:
-        await post_status.edit_text('🟥 Unexpected error. [not audio in MP4 metadata].')
+    title = get_title(mp4obj, movie_id)
+    movie_link_html = get_youtube_link_html(movie_id)
+    author = mp4obj.get('\xa9ART', ['Unknown'])[0]
 
-    title = str(movie_id)
-    if audio_mp4obj.get('\xa9nam'):
-        title = audio_mp4obj.get('\xa9nam')[0]
+    print('👺 Author: ', author)
+    caption_head = f'{title}\n{movie_link_html} [DURATION]' + context.get('additional_meta_text')
+    caption_head += f'\n{author}'
 
-    url_youtube = f'youtu.be/{movie_id}'
-    link_html = f'<a href=\"{url_youtube}\">{url_youtube}</a>'
-
-    title = capital2lower_letters_filter(title)
-    caption_head = f'{title}\n{link_html}'
     filename_head = output_filename_in_telegram(title)
 
-    timecodes = ['' for part in range(len(scheme))]
-    if timecodes_text := get_timecodes_text(audio_mp4obj.get('desc')):
-        timecodes = get_timestamps_group(timecodes_text, scheme)
+    timecodes = await get_timecodes(scheme, mp4obj.get('desc'))
 
     for idx, audio_part in enumerate(audios, start=1):
         print('💜 Idx: ', idx, 'part: ', audio_part)
 
         duration_formatted = filter_timestamp_format(timedelta(seconds=audio_part.get('duration')))
-        filename = filename_head
-        caption = f'{caption_head} [{duration_formatted}] ' + context.get('additional_meta_text')
-        if len(audios) != 1:
+        filename = 'FILENAME'
+        caption = 'CAPTION'
+
+        if len(audios) == 1:
+            filename = filename_head
+            caption = caption_head.replace('[DURATION]', f'[{duration_formatted}]')
+        else:
             filename = f'(p{idx}-of{len(audios)}) {filename_head}'
-            caption = f'[Part {idx} of {len(audios)}] {caption_head} [{duration_formatted}]'
+            caption = f'[Part {idx} of {len(audios)}] {caption_head}'.replace('[DURATION]', f'[{duration_formatted}]')
 
         caption += f'\n\n{timecodes[idx-1]}'
 
@@ -316,77 +258,11 @@ async def processing_commands(message: Message, command: dict, sender_id):
 
     await post_status.delete()
 
-    if not keepfiles:
-        await delete_files(data_dir, movie_id)
+    if not keepfiles_global:
+        print('🗑❌ Empty Files')
+        await delete_files_by_movie_id(data_dir, movie_id)
 
     print(f'💚 Success! [{movie_id}]\n')
-
-
-def parser_words(text):
-    context = {
-        'url': None,
-        'is_url_starting': False,
-        'params': [],
-    }
-    return
-
-
-def is_youtube_url(text):
-    YOUTUBE_DOMAINS = ['youtube.com', 'youtu.be']
-    for domain in YOUTUBE_DOMAINS:
-        if domain in text:
-            return True
-    return False
-
-
-def get_command_params_of_request2(text):
-    command_context = dict()
-    command_context['url'] = ''
-    command_context['url_started'] = False
-    command_context['name'] = ''
-    command_context['params'] = []
-
-    text = text.strip()
-    if not is_youtube_url(text):
-        return command_context
-
-    urls = URLExtract().find_urls(text)
-    for url in urls:
-        url = url.strip()
-        if is_youtube_url(url):
-            command_context['url'] = url
-    if not command_context['url']:
-        return command_context
-
-    if text.startswith(command_context.get('url')):
-        command_context['url_started'] = True
-
-    text = text.replace(command_context.get('url'), '')
-    text = text.strip()
-    text = text.replace('   ', ' ')
-    text = text.replace('  ', ' ')
-    parts = text.split(' ')
-
-    if not len(parts):
-        return command_context
-
-    command_index = -1
-    for idx, command in enumerate(ALL_COMMANDS):
-        if command.get('alias') == parts[0]:
-            command_index = idx
-
-    if command_index < 0:
-        return command_context
-
-    command_context['name'] = ALL_COMMANDS[command_index].get('name')
-
-    if len(parts) < 2:
-        return command_context
-
-    PARAMS_MAX_COUNT = 2
-    command_context['params'] = parts[1:PARAMS_MAX_COUNT+1]
-
-    return command_context
 
 
 @dp.message(CommandStart())
@@ -412,7 +288,7 @@ async def message_parser(message: Message) -> None:
     if not message.text:
         return
 
-    command_context = get_command_params_of_request2(message.text)
+    command_context = get_command_params_of_request(message.text)
 
     if not command_context.get('url'):
         return
@@ -424,7 +300,8 @@ async def message_parser(message: Message) -> None:
         command_context['name'] = 'download'
 
     print('🍒 command_context: ', command_context)
-    await asyncio.create_task(processing_commands(message, command_context, sender_id))
+    task = asyncio.create_task(processing_commands(message, command_context, sender_id))
+    await asyncio.wait_for(task, timeout=TASK_TIMEOUT_SECONDS)
 
 
 async def start_bot():
@@ -432,20 +309,20 @@ async def start_bot():
 
 
 def main():
+    print('🚀 Run bot ...')
+    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+
     parser = argparse.ArgumentParser(description='Bot ytb 2 audio')
     parser.add_argument('--keepfiles', type=int,
                         help='Keep raw files 1=True, 0=False (default)', default=0)
 
     args = parser.parse_args()
 
-    if args.keepfiles=='1':
-        keepfiles = True
+    if args.keepfiles == '1':
+        keepfiles_global = True
 
     asyncio.run(start_bot())
 
 
 if __name__ == "__main__":
-    print('😄 Start')
-    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
     main()
-

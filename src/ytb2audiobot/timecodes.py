@@ -6,6 +6,16 @@ TIMECODES_THRESHOLD_COUNT = 3
 CAPITAL_LETTERS_PERCENT_THRESHOLD = 0.3
 
 
+MOVIES_TEST_TIMCODES = '''
+Как миграция убивает францию
+https://www.youtube.com/watch?v=iR0ETOSis7Y
+
+Ремизов
+youtu.be/iI3qo1Bxi0o 
+
+'''
+
+
 def clean_timecodes_text(text):
     text = (text
             .replace('---', '')
@@ -89,10 +99,23 @@ def capital2lower_letters_filter(text):
     return text
 
 
+SYMBOLS_TO_CLEAN = '— – − - = _ |'
+
+
+def remove_started_symbols(text):
+    text = text.strip()
+    text = f'@@@{text}'
+    for _ in range(5):
+        for symb in SYMBOLS_TO_CLEAN.split(' '):
+            text = text.replace(f'@@@{symb}', '@@@')
+            text = text.strip()
+    return text.strip().replace('@@@', '').strip()
+
+
 def get_timestamps_group(text, scheme):
     timestamps_findall_results = re.findall(r'(\d*:?\d+:\d+)\s+(.+)', text)
     if not timestamps_findall_results:
-        return ['' for part in range(len(scheme))]
+        return ['' for _ in range(len(scheme))]
 
     timestamps_all = [{'time': time_to_seconds(stamp[0]), 'title': stamp[1]} for stamp in timestamps_findall_results]
 
@@ -104,6 +127,7 @@ def get_timestamps_group(text, scheme):
                 continue
             time = filter_timestamp_format(datetime.timedelta(seconds=stamp.get('time') - part[0]))
             title = capital2lower_letters_filter(stamp.get('title'))
+            title = remove_started_symbols(title)
             output_rows.append(f'{time} - {title}')
         timestamps_group.append('\n'.join(output_rows))
 
@@ -122,3 +146,10 @@ def get_timecodes_text(description):
         matches = re.compile(r'(\d{1,2}:\d{2})').findall(part)
         if len(matches) > TIMECODES_THRESHOLD_COUNT:
             return clean_timecodes_text(part)
+
+
+async def get_timecodes(scheme, text):
+    timecodes = ['' for _ in range(len(scheme))]
+    if timecodes_text := get_timecodes_text(text):
+        timecodes = get_timestamps_group(timecodes_text, scheme)
+    return timecodes

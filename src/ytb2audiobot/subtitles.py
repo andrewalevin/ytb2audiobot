@@ -1,6 +1,5 @@
 import time
 from string import Template
-
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled
 
 
