@@ -1,10 +1,9 @@
 import datetime
 import re
 
+from ytb2audiobot.utils import capital2lower
 
 TIMECODES_THRESHOLD_COUNT = 3
-CAPITAL_LETTERS_PERCENT_THRESHOLD = 0.3
-
 
 MOVIES_TEST_TIMCODES = '''
 Как миграция убивает францию
@@ -89,14 +88,6 @@ def filter_timestamp_format(_time):
     return _time.replace('@@', '').replace('##', '')
 
 
-def capital2lower_letters_filter(text):
-    count_capital = sum(1 for char in text if char.isupper())
-    if count_capital / len(text) < CAPITAL_LETTERS_PERCENT_THRESHOLD:
-        return text
-
-    text = text.lower()
-    text = text[0].upper() + text[1:]
-    return text
 
 
 SYMBOLS_TO_CLEAN = '— – − - = _ |'
@@ -126,7 +117,7 @@ def get_timestamps_group(text, scheme):
             if stamp.get('time') < part[0] or part[1] < stamp.get('time'):
                 continue
             time = filter_timestamp_format(datetime.timedelta(seconds=stamp.get('time') - part[0]))
-            title = capital2lower_letters_filter(stamp.get('title'))
+            title = capital2lower(stamp.get('title'))
             title = remove_started_symbols(title)
             output_rows.append(f'{time} - {title}')
         timestamps_group.append('\n'.join(output_rows))
@@ -152,4 +143,4 @@ async def get_timecodes(scheme, text):
     timecodes = ['' for _ in range(len(scheme))]
     if timecodes_text := get_timecodes_text(text):
         timecodes = get_timestamps_group(timecodes_text, scheme)
-    return timecodes
+    return timecodes, ''

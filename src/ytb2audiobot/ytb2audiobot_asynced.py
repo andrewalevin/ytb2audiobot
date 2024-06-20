@@ -3,6 +3,8 @@ import asyncio
 import logging
 import re
 import sys
+from string import Template
+
 from aiogram import Bot, Dispatcher, html
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
@@ -15,19 +17,21 @@ from telegram.constants import ParseMode
 from mutagen.mp4 import MP4
 from datetime import timedelta
 
-from utils4audio.duration import get_duration_asynced
-from ytb2audio.ytb2audio import download_audio, download_thumbnail, YT_DLP_OPTIONS_DEFAULT, get_youtube_move_id
+from ytb2audio.ytb2audio import download_audio, YT_DLP_OPTIONS_DEFAULT, get_youtube_move_id, \
+    download_thumbnail_by_movie
 from audio2splitted.audio2splitted import get_split_audio_scheme, make_split_audio, DURATION_MINUTES_MIN, \
     DURATION_MINUTES_MAX
 
-from ytb2audiobot.subtitles import get_subtitles
-from ytb2audiobot.commands import get_command_params_of_request
-from ytb2audiobot.thumbnail import image_compress_and_resize
-from ytb2audiobot.timecodes import capital2lower_letters_filter, get_timecodes_text, get_timestamps_group, \
-    filter_timestamp_format
-from ytb2audiobot.utils import delete_file_async, create_directory_async
 
+from ytb2audiobot.commands import get_command_params_of_request
+from ytb2audiobot.subtitles import get_subtitles
+from ytb2audiobot.thumbnail import image_compress_and_resize
+from ytb2audiobot.timecodes import filter_timestamp_format
+from ytb2audiobot.utils import delete_file_async, capital2lower
 from ytb2audiobot.timecodes import get_timecodes
+from ytb2audiobot.datadir import get_data_dir
+
+from ytb2audiobot.pytube import get_movie_meta
 
 dp = Dispatcher()
 
@@ -36,12 +40,12 @@ token = os.environ.get("TG_TOKEN")
 
 bot = Bot(token=token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
-DATA_DIR = '../../data'
+data_dir = get_data_dir()
 
 keepfiles_global = False
 
 SEND_AUDIO_TIMEOUT = 120
-TELEGRAM_CAPTION_TEXT_LONG_MAX = 1024-8
+TELEGRAM_CAPTION_MAX_TEXT_LONG = 1023
 
 AUDIO_SPLIT_THRESHOLD_MINUTES = 120
 AUDIO_SPLIT_DELTA_SECONDS = 5
@@ -52,6 +56,14 @@ AUDIO_BITRATE_MAX = 320
 MAX_TELEGRAM_BOT_TEXT_SIZE = 4095
 
 TASK_TIMEOUT_SECONDS = 60 * 30
+
+CAPTION_HEAD_TEMPLATE = Template('''
+$title
+<a href=\"youtu.be/$movieid\">youtu.be/$movieid</a> [$duration] $additional
+$author
+
+$timecodes
+''')
 
 
 def output_filename_in_telegram(text):
@@ -74,13 +86,8 @@ async def get_mp4object(path: pathlib.Path):
     return mp4object, ''
 
 
-async def get_data_dir():
-    data_dir = pathlib.Path(DATA_DIR)
-    return await create_directory_async(data_dir)
-
-
-async def delete_files_by_movie_id(data_dir, movie_id):
-    for file in list(filter(lambda file: (file.name.startswith(movie_id)), data_dir.iterdir())):
+async def delete_files_by_movie_id(datadir, movie_id):
+    for file in list(filter(lambda f: (f.name.startswith(movie_id)), datadir.iterdir())):
         await delete_file_async(file)
 
 
@@ -89,18 +96,41 @@ def get_title(mp4obj, movie_id):
     if mp4obj.get('\xa9nam'):
         title = mp4obj.get('\xa9nam')[0]
 
-    return capital2lower_letters_filter(title)
+    return capital2lower(title)
+
+
+def get_author(mp4obj, movie_id):
+    author = str(movie_id)
+    if mp4obj.get('\xa9ART', ['Unknown']):
+        author = mp4obj.get('\xa9ART', ['Unknown'])[0]
+
+    return capital2lower(author)
 
 
 def get_youtube_link_html(movie_id):
     url_youtube = f'youtu.be/{movie_id}'
     return f'<a href=\"{url_youtube}\">{url_youtube}</a>'
 
+
 async def processing_commands(message: Message, command: dict, sender_id):
     post_status = await message.reply(f'⌛️ Starting ... ')
 
     if not (movie_id := get_youtube_move_id(message.text)):
         return await post_status.edit_text('🟥️ Not a Youtube Movie ID')
+
+    movie_meta = dict()
+    movie_meta['id'] = movie_id
+    movie_meta['title'] = ''
+    movie_meta['author'] = ''
+    movie_meta['description'] = ''
+    movie_meta['thumbnail_url'] = ''
+    movie_meta['thumbnail_path'] = ''
+    movie_meta['additional'] = ''
+    movie_meta['duration'] = 0
+    movie_meta['timecodes'] = ['']
+    movie_meta['partition_caption'] = ['']
+    movie_meta['partition_filename'] = ['']
+    movie_meta['reply_to'] = [message.message_id]
 
     context = {
         'threshold_seconds': AUDIO_SPLIT_THRESHOLD_MINUTES * 60,
@@ -150,9 +180,6 @@ async def processing_commands(message: Message, command: dict, sender_id):
 
         text, _err = await get_subtitles(movie_id, param)
 
-        print('🫐 Get subtitles: ')
-        print(text, _err)
-
         if _err:
             return await post_status.edit_text(f'🟥️ Subtitles: {_err}')
         if not text:
@@ -173,28 +200,32 @@ async def processing_commands(message: Message, command: dict, sender_id):
 
     await post_status.edit_text(f'⌛️ Downloading ... ')
 
-    data_dir = await get_data_dir()
+    movie_meta = await get_movie_meta(movie_meta, movie_id)
 
     audio = await download_audio(movie_id, data_dir, context.get('ytdlprewriteoptions'))
     audio = pathlib.Path(audio)
     if not audio.exists():
         return await post_status.edit_text(f'🟥 Download. Unexpected error. After Check m4a_file.exists.')
 
-    thumbnail = await download_thumbnail(movie_id, data_dir)
-    thumbnail = pathlib.Path(thumbnail)
-    if not thumbnail.exists():
-        return await post_status.edit_text(f'🟥 Thumbnail. Unexpected error. After Check thumbnail.exists().')
-
-    thumbnail_compressed = await image_compress_and_resize(thumbnail)
-    if thumbnail_compressed.exists():
-        thumbnail = thumbnail_compressed
+    thumbnail, _err = await download_thumbnail_by_movie(movie_meta, data_dir)
+    if not thumbnail.exists() or _err:
+        await post_status.edit_text(f'🟠 Thumbnail. Unexpected error. After Check thumbnail.exists().')
+        movie_meta['thumbnail_path'] = None
     else:
-        await post_status.edit_text(f'🟥 Thumbnail Compression. Problem with image compression.')
+        movie_meta['thumbnail_path'] = thumbnail
 
-    audio_duration = await get_duration_asynced(audio)
+    if movie_meta['thumbnail_path']:
+        thumbnail_compressed = await image_compress_and_resize(thumbnail)
+        if not thumbnail_compressed.exists():
+            await post_status.edit_text(f'🟠 Thumbnail Compression. Problem with image compression.')
+        else:
+            movie_meta['thumbnail_path'] = thumbnail_compressed
+
+    print('🔮 Movie Meta:', movie_meta)
+    print()
 
     scheme = get_split_audio_scheme(
-        source_audio_length=audio_duration,
+        source_audio_length=movie_meta['duration'],
         duration_seconds=context['split_duration_minutes'] * 60,
         delta_seconds=AUDIO_SPLIT_DELTA_SECONDS,
         magic_tail=True,
@@ -204,7 +235,7 @@ async def processing_commands(message: Message, command: dict, sender_id):
 
     audios = await make_split_audio(
         audio_path=audio,
-        audio_duration=audio_duration,
+        audio_duration=movie_meta['duration'],
         output_folder=data_dir,
         scheme=scheme
     )
@@ -214,44 +245,53 @@ async def processing_commands(message: Message, command: dict, sender_id):
     if _err:
         await post_status.edit_text(f'🟥 Exception as e: [m4a = MP4(m4a_file.as_posix())]. \n\n{_err}')
 
-    title = get_title(mp4obj, movie_id)
-    movie_link_html = get_youtube_link_html(movie_id)
-    author = mp4obj.get('\xa9ART', ['Unknown'])[0]
+    if not movie_meta['description']:
+        movie_meta['description'] = mp4obj.get('desc')
 
-    print('👺 Author: ', author)
-    caption_head = f'{title}\n{movie_link_html} [DURATION]' + context.get('additional_meta_text')
-    caption_head += f'\n{author}'
+    timecodes, _err = await get_timecodes(scheme, movie_meta['description'])
+    if _err:
+        await post_status.edit_text(f'🟠 Timecodes. Error creation.')
+    else:
+        movie_meta['timecodes'] = timecodes
 
-    filename_head = output_filename_in_telegram(title)
+    caption_head = CAPTION_HEAD_TEMPLATE.safe_substitute(
+        movieid=movie_meta['id'],
+        title=capital2lower(movie_meta['title']),
+        author=capital2lower(movie_meta['author']),
+        additional=movie_meta['additional']
+    )
+    filename_head = output_filename_in_telegram(movie_meta['title'])
 
-    timecodes = await get_timecodes(scheme, mp4obj.get('desc'))
+    if len(audios) > 1:
+        for idx, audio_part in enumerate(audios, start=1):
+            movie_meta['partition_caption'].append(f'[Part {idx} of {len(audios)}]')
+            movie_meta['partition_filename'].append(f'(p{idx}-of{len(audios)})')
+            if idx != 1:
+                movie_meta['reply_to'].append(None)
+
+    print('🖼 movie_meta: ', movie_meta)
+    print()
 
     for idx, audio_part in enumerate(audios, start=1):
         print('💜 Idx: ', idx, 'part: ', audio_part)
+        caption = Template(caption_head).safe_substitute(
+            partiotion=movie_meta['partition_caption'][idx-1],
+            timecodes=timecodes[idx-1],
+            duration=filter_timestamp_format(timedelta(seconds=audio_part.get('duration')))
+        )
 
-        duration_formatted = filter_timestamp_format(timedelta(seconds=audio_part.get('duration')))
-        filename = 'FILENAME'
-        caption = 'CAPTION'
-
-        if len(audios) == 1:
-            filename = filename_head
-            caption = caption_head.replace('[DURATION]', f'[{duration_formatted}]')
-        else:
-            filename = f'(p{idx}-of{len(audios)}) {filename_head}'
-            caption = f'[Part {idx} of {len(audios)}] {caption_head}'.replace('[DURATION]', f'[{duration_formatted}]')
-
-        caption += f'\n\n{timecodes[idx-1]}'
-
-        if len(caption) > TELEGRAM_CAPTION_TEXT_LONG_MAX-8:
-            caption_trimmed = caption[:TELEGRAM_CAPTION_TEXT_LONG_MAX-8]
-            caption = f'{caption_trimmed}\n...'
+        if len(caption) > TELEGRAM_CAPTION_MAX_TEXT_LONG:
+            caption = caption[:TELEGRAM_CAPTION_MAX_TEXT_LONG - 8] + '\n...'
 
         await bot.send_audio(
             chat_id=sender_id,
-            reply_to_message_id=message.message_id,
-            audio=FSInputFile(audio_part.get('path'), filename=filename),
-            duration=audio_part.get('duration'),
-            thumbnail=FSInputFile(thumbnail),
+            reply_to_message_id=movie_meta['reply_to'][idx-1],
+            audio=FSInputFile(
+                path=audio_part['path'],
+                filename=movie_meta['partition_filename'][idx-1] + filename_head),
+            duration=audio_part['duration'],
+            thumbnail=FSInputFile(
+                path=movie_meta['thumbnail_path']),
             caption=caption,
             parse_mode=ParseMode.HTML
         )
@@ -319,6 +359,7 @@ def main():
     args = parser.parse_args()
 
     if args.keepfiles == '1':
+        global keepfiles_global
         keepfiles_global = True
 
     asyncio.run(start_bot())
