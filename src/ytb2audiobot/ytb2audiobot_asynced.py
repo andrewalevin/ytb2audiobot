@@ -45,7 +45,7 @@ data_dir = get_data_dir()
 keepfiles_global = False
 
 SEND_AUDIO_TIMEOUT = 120
-TELEGRAM_CAPTION_MAX_TEXT_LONG = 1023
+TG_CAPTION_MAX_LONG = 1023
 
 AUDIO_SPLIT_THRESHOLD_MINUTES = 120
 AUDIO_SPLIT_DELTA_SECONDS = 5
@@ -58,7 +58,7 @@ MAX_TELEGRAM_BOT_TEXT_SIZE = 4095
 TASK_TIMEOUT_SECONDS = 60 * 30
 
 CAPTION_HEAD_TEMPLATE = Template('''
-$title
+$partition $title
 <a href=\"youtu.be/$movieid\">youtu.be/$movieid</a> [$duration] $additional
 $author
 
@@ -128,9 +128,6 @@ async def processing_commands(message: Message, command: dict, sender_id):
     movie_meta['additional'] = ''
     movie_meta['duration'] = 0
     movie_meta['timecodes'] = ['']
-    movie_meta['partition_caption'] = ['']
-    movie_meta['partition_filename'] = ['']
-    movie_meta['reply_to'] = [message.message_id]
 
     context = {
         'threshold_seconds': AUDIO_SPLIT_THRESHOLD_MINUTES * 60,
@@ -221,9 +218,6 @@ async def processing_commands(message: Message, command: dict, sender_id):
         else:
             movie_meta['thumbnail_path'] = thumbnail_compressed
 
-    print('🔮 Movie Meta:', movie_meta)
-    print()
-
     scheme = get_split_audio_scheme(
         source_audio_length=movie_meta['duration'],
         duration_seconds=context['split_duration_minutes'] * 60,
@@ -260,39 +254,27 @@ async def processing_commands(message: Message, command: dict, sender_id):
         author=capital2lower(movie_meta['author']),
         additional=movie_meta['additional']
     )
-    filename_head = output_filename_in_telegram(movie_meta['title'])
-
-    if len(audios) > 1:
-        for idx, audio_part in enumerate(audios, start=1):
-            movie_meta['partition_caption'].append(f'[Part {idx} of {len(audios)}]')
-            movie_meta['partition_filename'].append(f'(p{idx}-of{len(audios)})')
-            if idx != 1:
-                movie_meta['reply_to'].append(None)
-
-    print('🖼 movie_meta: ', movie_meta)
-    print()
-
+    filename = output_filename_in_telegram(movie_meta['title'])
     for idx, audio_part in enumerate(audios, start=1):
         print('💜 Idx: ', idx, 'part: ', audio_part)
+
         caption = Template(caption_head).safe_substitute(
-            partiotion=movie_meta['partition_caption'][idx-1],
+            partition='' if len(audios) == 1 else f'[Part {idx} of {len(audios)}]',
             timecodes=timecodes[idx-1],
             duration=filter_timestamp_format(timedelta(seconds=audio_part.get('duration')))
         )
 
-        if len(caption) > TELEGRAM_CAPTION_MAX_TEXT_LONG:
-            caption = caption[:TELEGRAM_CAPTION_MAX_TEXT_LONG - 8] + '\n...'
-
         await bot.send_audio(
             chat_id=sender_id,
-            reply_to_message_id=movie_meta['reply_to'][idx-1],
+            reply_to_message_id=message.message_id if idx == 1 else None,
             audio=FSInputFile(
                 path=audio_part['path'],
-                filename=movie_meta['partition_filename'][idx-1] + filename_head),
+                filename=filename if len(audios) == 1 else f'(p{idx}-of{len(audios)}) {filename}',
+            ),
             duration=audio_part['duration'],
             thumbnail=FSInputFile(
                 path=movie_meta['thumbnail_path']),
-            caption=caption,
+            caption=caption if len(caption) < TG_CAPTION_MAX_LONG else caption[:TG_CAPTION_MAX_LONG - 8] + '\n...',
             parse_mode=ParseMode.HTML
         )
 
@@ -361,6 +343,7 @@ def main():
     if args.keepfiles == '1':
         global keepfiles_global
         keepfiles_global = True
+        print('🔓🗂 Keep files: ', keepfiles_global)
 
     asyncio.run(start_bot())
 
