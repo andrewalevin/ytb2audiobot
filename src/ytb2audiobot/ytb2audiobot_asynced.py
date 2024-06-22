@@ -17,11 +17,10 @@ from telegram.constants import ParseMode
 from mutagen.mp4 import MP4
 from datetime import timedelta
 
-from ytb2audio.ytb2audio import download_audio, YT_DLP_OPTIONS_DEFAULT, get_youtube_move_id, \
-    download_thumbnail_by_movie
+from ytb2audio.ytb2audio import YT_DLP_OPTIONS_DEFAULT, get_youtube_move_id, download_thumbnail_by_movie_meta, \
+    download_audio_by_movie_meta
 from audio2splitted.audio2splitted import get_split_audio_scheme, make_split_audio, DURATION_MINUTES_MIN, \
     DURATION_MINUTES_MAX
-
 
 from ytb2audiobot.commands import get_command_params_of_request
 from ytb2audiobot.subtitles import get_subtitles
@@ -30,7 +29,6 @@ from ytb2audiobot.timecodes import filter_timestamp_format
 from ytb2audiobot.utils import delete_file_async, capital2lower
 from ytb2audiobot.timecodes import get_timecodes
 from ytb2audiobot.datadir import get_data_dir
-
 from ytb2audiobot.pytube import get_movie_meta
 
 dp = Dispatcher()
@@ -42,7 +40,7 @@ bot = Bot(token=token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
 data_dir = get_data_dir()
 
-keepfiles_global = False
+keep_data_files = False
 
 SEND_AUDIO_TIMEOUT = 120
 TG_CAPTION_MAX_LONG = 1023
@@ -66,13 +64,12 @@ $timecodes
 ''')
 
 
-def output_filename_in_telegram(text):
+def filename_m4a(text):
     name = (re.sub(r'[^\w\s\-\_\(\)\[\]]', ' ', text)
             .replace('    ', ' ')
             .replace('   ', ' ')
             .replace('  ', ' ')
             .strip())
-
     return f'{name}.m4a'
 
 
@@ -81,35 +78,13 @@ async def get_mp4object(path: pathlib.Path):
     try:
         mp4object = MP4(path.as_posix())
     except Exception as e:
-        return {}, e
-
-    return mp4object, ''
+        return {}
+    return mp4object
 
 
 async def delete_files_by_movie_id(datadir, movie_id):
     for file in list(filter(lambda f: (f.name.startswith(movie_id)), datadir.iterdir())):
         await delete_file_async(file)
-
-
-def get_title(mp4obj, movie_id):
-    title = str(movie_id)
-    if mp4obj.get('\xa9nam'):
-        title = mp4obj.get('\xa9nam')[0]
-
-    return capital2lower(title)
-
-
-def get_author(mp4obj, movie_id):
-    author = str(movie_id)
-    if mp4obj.get('\xa9ART', ['Unknown']):
-        author = mp4obj.get('\xa9ART', ['Unknown'])[0]
-
-    return capital2lower(author)
-
-
-def get_youtube_link_html(movie_id):
-    url_youtube = f'youtu.be/{movie_id}'
-    return f'<a href=\"{url_youtube}\">{url_youtube}</a>'
 
 
 async def processing_commands(message: Message, command: dict, sender_id):
@@ -124,24 +99,23 @@ async def processing_commands(message: Message, command: dict, sender_id):
     movie_meta['author'] = ''
     movie_meta['description'] = ''
     movie_meta['thumbnail_url'] = ''
-    movie_meta['thumbnail_path'] = ''
+    movie_meta['thumbnail_path'] = None
     movie_meta['additional'] = ''
     movie_meta['duration'] = 0
     movie_meta['timecodes'] = ['']
 
-    context = {
-        'threshold_seconds': AUDIO_SPLIT_THRESHOLD_MINUTES * 60,
-        'split_duration_minutes': 39,
-        'ytdlprewriteoptions': YT_DLP_OPTIONS_DEFAULT,
-        'additional_meta_text': ''
-    }
+    movie_meta['threshold_seconds'] = AUDIO_SPLIT_THRESHOLD_MINUTES * 60
+    movie_meta['split_duration_minutes'] = 39
+    movie_meta['ytdlprewriteoptions'] = YT_DLP_OPTIONS_DEFAULT
+    movie_meta['additional_meta_text'] = ''
+    movie_meta['store'] = data_dir
 
     if not command.get('name'):
         return await post_status.edit_text('🟥️ No Command')
 
     if command.get('name') == 'split':
         # Make split with Default split
-        context['threshold_seconds'] = 1
+        movie_meta['threshold_seconds'] = 1
 
         if command.get('params'):
             param = command.get('params')[0]
@@ -151,7 +125,7 @@ async def processing_commands(message: Message, command: dict, sender_id):
             if param < DURATION_MINUTES_MIN or DURATION_MINUTES_MAX < param:
                 return await post_status.edit_text(f'🟥️ Param if split = {param} '
                                                    f'is out of [{DURATION_MINUTES_MIN}, {DURATION_MINUTES_MAX}]')
-            context['split_duration_minutes'] = param
+            movie_meta['split_duration_minutes'] = param
 
     elif command.get('name') == 'bitrate':
         if not command.get('params'):
@@ -166,8 +140,8 @@ async def processing_commands(message: Message, command: dict, sender_id):
             return await post_status.edit_text(f'🟥️ Bitrate. Param {param} '
                                                f'is out of [{AUDIO_BITRATE_MIN}, ... , {AUDIO_BITRATE_MAX}]')
 
-        context['ytdlprewriteoptions'] = context.get('ytdlprewriteoptions').replace('48k', f'{param}k')
-        context['additional_meta_text'] = f'{param}k bitrate'
+        movie_meta['ytdlprewriteoptions'] = movie_meta['ytdlprewriteoptions'].replace('48k', f'{param}k')
+        movie_meta['additional_meta_text'] = f'{param}k bitrate'
 
     elif command.get('name') == 'subtitles':
         param = ''
@@ -176,7 +150,6 @@ async def processing_commands(message: Message, command: dict, sender_id):
             param = ' '.join(params)
 
         text, _err = await get_subtitles(movie_id, param)
-
         if _err:
             return await post_status.edit_text(f'🟥️ Subtitles: {_err}')
         if not text:
@@ -199,54 +172,64 @@ async def processing_commands(message: Message, command: dict, sender_id):
 
     movie_meta = await get_movie_meta(movie_meta, movie_id)
 
-    audio = await download_audio(movie_id, data_dir, context.get('ytdlprewriteoptions'))
-    audio = pathlib.Path(audio)
+    tasks = [
+        download_audio_by_movie_meta(movie_meta),
+        download_thumbnail_by_movie_meta(movie_meta)
+    ]
+    results = await asyncio.gather(*tasks)
+
+    print("🌵 Gather 1. All tasks completed")
+
+    audio = results[0]
+    movie_meta['thumbnail_path'] = results[1]
+
     if not audio.exists():
-        return await post_status.edit_text(f'🟥 Download. Unexpected error. After Check m4a_file.exists.')
+        return await post_status.edit_text(f'🔴 Download. Not exists file')
 
-    thumbnail, _err = await download_thumbnail_by_movie(movie_meta, data_dir)
-    if not thumbnail.exists() or _err:
-        await post_status.edit_text(f'🟠 Thumbnail. Unexpected error. After Check thumbnail.exists().')
-        movie_meta['thumbnail_path'] = None
-    else:
-        movie_meta['thumbnail_path'] = thumbnail
-
-    if movie_meta['thumbnail_path']:
-        thumbnail_compressed = await image_compress_and_resize(thumbnail)
-        if not thumbnail_compressed.exists():
-            await post_status.edit_text(f'🟠 Thumbnail Compression. Problem with image compression.')
-        else:
-            movie_meta['thumbnail_path'] = thumbnail_compressed
+    if not pathlib.Path(movie_meta['thumbnail_path']).exists():
+        return await post_status.edit_text(f'🟠 Thumbnail. Not exists.')
 
     scheme = get_split_audio_scheme(
         source_audio_length=movie_meta['duration'],
-        duration_seconds=context['split_duration_minutes'] * 60,
+        duration_seconds=movie_meta['split_duration_minutes'] * 60,
         delta_seconds=AUDIO_SPLIT_DELTA_SECONDS,
         magic_tail=True,
-        threshold_seconds=context['threshold_seconds']
+        threshold_seconds=movie_meta['threshold_seconds']
     )
-    print('📊 scheme: ', scheme)
 
-    audios = await make_split_audio(
-        audio_path=audio,
-        audio_duration=movie_meta['duration'],
-        output_folder=data_dir,
-        scheme=scheme
-    )
+    tasks = [
+        image_compress_and_resize(movie_meta['thumbnail_path']),
+        make_split_audio(
+            audio_path=audio,
+            audio_duration=movie_meta['duration'],
+            output_folder=data_dir,
+            scheme=scheme
+        ),
+        get_mp4object(audio)
+    ]
+    results = await asyncio.gather(*tasks)
+    print("🌵🌵 Gather 2. All tasks completed")
+
+    thumbnail_compressed = results[0]
+    audios = results[1]
+    mp4obj = results[2]
+
+    if not thumbnail_compressed.exists():
+        await post_status.edit_text(f'🟠 Thumbnail Compression. Problem with image compression.')
+    else:
+        movie_meta['thumbnail_path'] = thumbnail_compressed
+
+    if not mp4obj:
+        await post_status.edit_text(f'🟠 MP4 Mutagen .m4a.')
+
     await post_status.edit_text('⌛ Uploading to Telegram ... ')
 
-    mp4obj, _err = await get_mp4object(audio)
-    if _err:
-        await post_status.edit_text(f'🟥 Exception as e: [m4a = MP4(m4a_file.as_posix())]. \n\n{_err}')
-
-    if not movie_meta['description']:
+    if not movie_meta['description'] and mp4obj.get('desc'):
         movie_meta['description'] = mp4obj.get('desc')
 
     timecodes, _err = await get_timecodes(scheme, movie_meta['description'])
     if _err:
         await post_status.edit_text(f'🟠 Timecodes. Error creation.')
-    else:
-        movie_meta['timecodes'] = timecodes
 
     caption_head = CAPTION_HEAD_TEMPLATE.safe_substitute(
         movieid=movie_meta['id'],
@@ -254,7 +237,7 @@ async def processing_commands(message: Message, command: dict, sender_id):
         author=capital2lower(movie_meta['author']),
         additional=movie_meta['additional']
     )
-    filename = output_filename_in_telegram(movie_meta['title'])
+    filename = filename_m4a(movie_meta['title'])
     for idx, audio_part in enumerate(audios, start=1):
         print('💜 Idx: ', idx, 'part: ', audio_part)
 
@@ -269,7 +252,7 @@ async def processing_commands(message: Message, command: dict, sender_id):
             reply_to_message_id=message.message_id if idx == 1 else None,
             audio=FSInputFile(
                 path=audio_part['path'],
-                filename=filename if len(audios) == 1 else f'(p{idx}-of{len(audios)}) {filename}',
+                filename=filename if len(audios) == 1 else f'p{idx}_of{len(audios)} {filename}',
             ),
             duration=audio_part['duration'],
             thumbnail=FSInputFile(
@@ -280,7 +263,7 @@ async def processing_commands(message: Message, command: dict, sender_id):
 
     await post_status.delete()
 
-    if not keepfiles_global:
+    if not keep_data_files:
         print('🗑❌ Empty Files')
         await delete_files_by_movie_id(data_dir, movie_id)
 
@@ -294,7 +277,7 @@ async def command_start_handler(message: Message) -> None:
 
 @dp.message()
 @dp.channel_post()
-async def message_parser(message: Message) -> None:
+async def message_parser_handler(message: Message) -> None:
     sender_id = None
     sender_type = None
     if message.from_user:
@@ -331,19 +314,18 @@ async def start_bot():
 
 
 def main():
-    print('🚀 Run bot ...')
+    print('🚀 Running bot ...')
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 
     parser = argparse.ArgumentParser(description='Bot ytb 2 audio')
     parser.add_argument('--keepfiles', type=int,
                         help='Keep raw files 1=True, 0=False (default)', default=0)
-
     args = parser.parse_args()
 
-    if args.keepfiles == '1':
-        global keepfiles_global
-        keepfiles_global = True
-        print('🔓🗂 Keep files: ', keepfiles_global)
+    if args.keepfiles == 1:
+        global keep_data_files
+        keep_data_files = True
+        print('🔓🗂 Keeping Data files: ', keep_data_files)
 
     asyncio.run(start_bot())
 

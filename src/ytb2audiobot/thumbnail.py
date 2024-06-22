@@ -15,3 +15,5 @@ async def image_compress_and_resize(
         output = path
     image.save(output, optimize=True, quality=quality)
     return output
+
+

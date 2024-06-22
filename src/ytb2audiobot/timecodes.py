@@ -114,7 +114,7 @@ def get_timestamps_group(text, scheme):
     for idx, part in enumerate(scheme):
         output_rows = []
         for stamp in timestamps_all:
-            if stamp.get('time') < part[0] or part[1] < stamp.get('time'):
+            if int(stamp.get('time')) < int(part[0]) or int(part[1]) < int(stamp.get('time')):
                 continue
             time = filter_timestamp_format(datetime.timedelta(seconds=stamp.get('time') - part[0]))
             title = capital2lower(stamp.get('title'))
