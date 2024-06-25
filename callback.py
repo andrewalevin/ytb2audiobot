@@ -1,3 +1,10 @@
+from aiogram.filters import CommandStart
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+token = os.environ.get("TG_TOKEN")
+
 import asyncio
 import logging
 import os
@@ -6,37 +13,53 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dotenv import load_dotenv
 
-API_TOKEN = 'YOUR_BOT_API_TOKEN'
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
-
-load_dotenv()
-token = os.environ.get("TG_TOKEN")
 
 # Initialize bot and dispatcher
 bot = Bot(token=token)
 dp = Dispatcher()
 
-# Create inline keyboard
-inline_kb = InlineKeyboardMarkup().add(
-    InlineKeyboardButton('Button 1', callback_data='button1'),
-    InlineKeyboardButton('Button 2', callback_data='button2')
+
+kb = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(text="Button-1", callback_data="button1"),
+            InlineKeyboardButton(text="Button-2", callback_data="button2"),
+        ]
+    ],
+    row_width=2
 )
 
 
-@dp.message_handler(commands=['start'])
+@dp.message(CommandStart())
 async def send_welcome(message: types.Message):
-    await message.reply("Hi! I'm your bot. Use the buttons below.", reply_markup=inline_kb)
+    await message.reply(f'Choose option', reply_markup=kb)
+
+    if False:
+        timer = 10
+        text = f"Choose one of these options. Hide over seconds: "
+        post = await message.reply(f'{text} {timer}', reply_markup=kb)
+        while timer:
+            timer -= 1
+            await post.edit_text(f'{text} {timer}', reply_markup=kb)
+            await asyncio.sleep(1)
+
+        await post.delete()
 
 
-@dp.callback_query_handler(lambda c: c.data)
-async def process_callback(callback_query: types.CallbackQuery):
-    if callback_query.data == 'button1':
-        await bot.send_message(callback_query.from_user.id, 'You pressed Button 1')
-    elif callback_query.data == 'button2':
-        await bot.send_message(callback_query.from_user.id, 'You pressed Button 2')
+
+@dp.callback_query(lambda c: c.data == 'button1')
+async def process_callback_button1(callback_query: types.CallbackQuery):
     await bot.answer_callback_query(callback_query.id)
+    await bot.send_message(callback_query.from_user.id, 'You pressed Button 1!')
+
+
+@dp.callback_query(lambda c: c.data == 'button2')
+async def process_callback_button2(callback_query: types.CallbackQuery):
+    await bot.answer_callback_query(callback_query.id)
+    await bot.send_message(callback_query.from_user.id, 'You pressed Button 2!')
 
 
 async def run():

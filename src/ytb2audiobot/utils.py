@@ -1,5 +1,6 @@
 import asyncio
 import pathlib
+import re
 from pathlib import Path
 
 import aiofiles
@@ -39,3 +40,17 @@ def capital2lower(text):
     text = text.lower()
     text = text[0].upper() + text[1:]
     return text
+
+
+def filename_m4a(text):
+    name = (re.sub(r'[^\w\s\-\_\(\)\[\]]', ' ', text)
+            .replace('    ', ' ')
+            .replace('   ', ' ')
+            .replace('  ', ' ')
+            .strip())
+    return f'{name}.m4a'
+
+
+async def delete_files_by_movie_id(datadir, movie_id):
+    for file in list(filter(lambda f: (f.name.startswith(movie_id)), datadir.iterdir())):
+        await delete_file_async(file)

@@ -31,7 +31,7 @@ COMMANDS_FORCE_DOWNLOAD = [
     {'name': 'download', 'alias': 'ск'},
 ]
 
-ALL_COMMANDS = COMMANDS_SPLIT + COMMANDS_BITRATE + COMMANDS_SUBTITLES + COMMANDS_FORCE_DOWNLOAD
+ALL_COMMANDS = COMMANDS_SPLIT + COMMANDS_BITRATE + COMMANDS_SUBTITLES
 
 YOUTUBE_DOMAINS = ['youtube.com', 'youtu.be']
 
@@ -52,6 +52,8 @@ def get_command_params_of_request(text):
     command_context['url_started'] = False
     command_context['name'] = ''
     command_context['params'] = []
+    command_context['force_download'] = False
+    command_context['post_status_id'] = None
 
     text = text.strip()
     if not is_youtube_url(text):
@@ -74,8 +76,17 @@ def get_command_params_of_request(text):
     text = text.replace('  ', ' ')
     parts = text.split(' ')
 
+    print('🌈 Parts of Request: ', parts)
+    print()
+
     if not len(parts):
         return command_context
+
+    for idx, command in enumerate(COMMANDS_FORCE_DOWNLOAD):
+        if command.get('alias') == parts[0]:
+            print('🏺 Found bot')
+            command_context['force_download'] = True
+            parts = parts[1:]
 
     command_index = -1
     for idx, command in enumerate(ALL_COMMANDS):

@@ -1,14 +1,5 @@
 import logging
 import os
-
-import aiogram.utils.markdown as md
-from aiogram import Bot, Dispatcher, types
-from aiogram.contrib.fsm_storage.memory import MemoryStorage
-from aiogram.dispatcher import FSMContext
-from aiogram.dispatcher.filters import Text
-from aiogram.dispatcher.filters.state import State, StatesGroup
-from aiogram.types import ParseMode
-from aiogram.utils import executor
 from dotenv import load_dotenv
 
 logging.basicConfig(level=logging.INFO)
@@ -18,35 +9,54 @@ API_TOKEN = 'BOT TOKEN HERE'
 load_dotenv()
 token = os.environ.get("TG_TOKEN")
 
-bot = Bot(token=token)
 
-# For example use simple MemoryStorage for Dispatcher.
-storage = MemoryStorage()
-dp = Dispatcher(bot, storage=storage)
+import asyncio
+import logging
+import sys
+from os import getenv
+from typing import Any, Dict
+
+from aiogram import Bot, Dispatcher, F, Router, html
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+from aiogram.filters import Command, CommandStart
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import (
+    KeyboardButton,
+    Message,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
+)
+
+TOKEN = getenv("BOT_TOKEN")
+
+form_router = Router()
 
 
-# States
 class Form(StatesGroup):
-    name = State()  # Will be represented in storage as 'Form:name'
-    age = State()  # Will be represented in storage as 'Form:age'
-    gender = State()  # Will be represented in storage as 'Form:gender'
+    name = State()
+    like_bots = State()
+    language = State()
 
 
-@dp.message_handler(commands='start')
-async def cmd_start(message: types.Message):
-    """
-    Conversation's entry point
-    """
-    # Set state
-    await Form.name.set()
-
-    await message.reply("Hi there! What's your name?")
+@form_router.message()
+@form_router.channel_post()
+async def al_messages(message: Message, state: FSMContext) -> None:
+    await message.reply('🦄 Got Message : ')
 
 
-# You can use state '*' if you need to handle all states
-@dp.message_handler(state='*', commands='cancel')
-@dp.message_handler(Text(equals='cancel', ignore_case=True), state='*')
-async def cancel_handler(message: types.Message, state: FSMContext):
+@form_router.message(CommandStart())
+async def command_start(message: Message, state: FSMContext) -> None:
+    await message.answer(
+        "Hi there! What's your name?",
+        reply_markup=ReplyKeyboardRemove(),
+    )
+
+
+@form_router.message(Command("cancel"))
+@form_router.message(F.text.casefold() == "cancel")
+async def cancel_handler(message: Message, state: FSMContext) -> None:
     """
     Allow user to cancel any action
     """
@@ -54,80 +64,98 @@ async def cancel_handler(message: types.Message, state: FSMContext):
     if current_state is None:
         return
 
-    logging.info('Cancelling state %r', current_state)
-    # Cancel state and inform user about it
-    await state.finish()
-    # And remove keyboard (just in case)
-    await message.reply('Cancelled.', reply_markup=types.ReplyKeyboardRemove())
+    logging.info("Cancelling state %r", current_state)
+    await state.clear()
+    await message.answer(
+        "Cancelled.",
+        reply_markup=ReplyKeyboardRemove(),
+    )
 
 
-@dp.message_handler(state=Form.name)
-async def process_name(message: types.Message, state: FSMContext):
-    """
-    Process user name
-    """
-    async with state.proxy() as data:
-        data['name'] = message.text
-
-    await Form.next()
-    await message.reply("How old are you?")
-
-
-# Check age. Age gotta be digit
-@dp.message_handler(lambda message: not message.text.isdigit(), state=Form.age)
-async def process_age_invalid(message: types.Message):
-    """
-    If age is invalid
-    """
-    return await message.reply("Age gotta be a number.\nHow old are you? (digits only)")
+@form_router.message(Form.name)
+async def process_name(message: Message, state: FSMContext) -> None:
+    await state.update_data(name=message.text)
+    await state.set_state(Form.like_bots)
+    await message.answer(
+        f"Nice to meet you, {html.quote(message.text)}!\nDid you like to write bots?",
+        reply_markup=ReplyKeyboardMarkup(
+            keyboard=[
+                [
+                    KeyboardButton(text="Yes"),
+                    KeyboardButton(text="No"),
+                ]
+            ],
+            resize_keyboard=True,
+        ),
+    )
 
 
-@dp.message_handler(lambda message: message.text.isdigit(), state=Form.age)
-async def process_age(message: types.Message, state: FSMContext):
-    # Update state and data
-    await Form.next()
-    await state.update_data(age=int(message.text))
-
-    # Configure ReplyKeyboardMarkup
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, selective=True)
-    markup.add("Male", "Female")
-    markup.add("Other")
-
-    await message.reply("What is your gender?", reply_markup=markup)
+@form_router.message(Form.like_bots, F.text.casefold() == "no")
+async def process_dont_like_write_bots(message: Message, state: FSMContext) -> None:
+    data = await state.get_data()
+    await state.clear()
+    await message.answer(
+        "Not bad not terrible.\nSee you soon.",
+        reply_markup=ReplyKeyboardRemove(),
+    )
+    await show_summary(message=message, data=data, positive=False)
 
 
-@dp.message_handler(lambda message: message.text not in ["Male", "Female", "Other"], state=Form.gender)
-async def process_gender_invalid(message: types.Message):
-    """
-    In this example gender has to be one of: Male, Female, Other.
-    """
-    return await message.reply("Bad gender name. Choose your gender from the keyboard.")
+@form_router.message(Form.like_bots, F.text.casefold() == "yes")
+async def process_like_write_bots(message: Message, state: FSMContext) -> None:
+    await state.set_state(Form.language)
+
+    await message.reply(
+        "Cool! I'm too!\nWhat programming language did you use for it?",
+        reply_markup=ReplyKeyboardRemove(),
+    )
 
 
-@dp.message_handler(state=Form.gender)
-async def process_gender(message: types.Message, state: FSMContext):
-    async with state.proxy() as data:
-        data['gender'] = message.text
+@form_router.message(Form.like_bots)
+async def process_unknown_write_bots(message: Message) -> None:
+    await message.reply("I don't understand you :(")
 
-        # Remove keyboard
-        markup = types.ReplyKeyboardRemove()
 
-        # And send message
-        await bot.send_message(
-            message.chat.id,
-            md.text(
-                md.text('Hi! Nice to meet you,', md.bold(data['name'])),
-                md.text('Age:', md.code(data['age'])),
-                md.text('Gender:', data['gender']),
-                sep='\n',
-            ),
-            reply_markup=markup,
-            parse_mode=ParseMode.MARKDOWN,
+@form_router.message(Form.language)
+async def process_language(message: Message, state: FSMContext) -> None:
+    data = await state.update_data(language=message.text)
+    await state.clear()
+
+    if message.text.casefold() == "python":
+        await message.reply(
+            "Python, you say? That's the language that makes my circuits light up! 😉"
         )
 
-    # Finish conversation
-    await state.finish()
+    await show_summary(message=message, data=data)
 
 
-if __name__ == '__main__':
-    executor.start_polling(dp, skip_updates=True)
+
+
+
+async def show_summary(message: Message, data: Dict[str, Any], positive: bool = True) -> None:
+    name = data["name"]
+    language = data.get("language", "<something unexpected>")
+    text = f"I'll keep in mind that, {html.quote(name)}, "
+    text += (
+        f"you like to write bots with {html.quote(language)}."
+        if positive
+        else "you don't like to write bots, so sad..."
+    )
+    await message.answer(text=text, reply_markup=ReplyKeyboardRemove())
+
+
+async def main():
+    # Initialize Bot instance with default bot properties which will be passed to all API calls
+    bot = Bot(token=token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+
+    dp = Dispatcher()
+
+    dp.include_router(form_router)
+
+    # Start event dispatching
+    await dp.start_polling(bot)
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+    asyncio.run(main())
