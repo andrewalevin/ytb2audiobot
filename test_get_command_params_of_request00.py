@@ -1,6 +1,6 @@
 import unittest
 
-from src.ytb2audiobot.ytb2audiobot_asynced import get_command_params_of_request as parser
+from src.ytb2audiobot.ytb2audiobot import get_command_params_of_request as parser
 
 
 TESTS = [

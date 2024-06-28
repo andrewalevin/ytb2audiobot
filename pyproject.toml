@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"  # If not defined, then legacy behavior 
 
 [project]
 name = "ytb2audiobot"
-version = "2.104"
+version = "2.189"
 
 description = "🦜 Youtube to Audio by Andrew A Levin"
 readme = "README.md"
@@ -55,7 +55,9 @@ dependencies = [
   'pyyaml',
   'aiofiles',
   'aiogram',
-  'urlextract'
+  'urlextract',
+  'dramatiq',
+  'redis'
 ]
 
 [project.optional-dependencies]
@@ -70,7 +72,7 @@ test = ["coverage"]
 "Source" = "https://github.com/andrewalevin"
 
 [project.scripts]
-ytb2audiobot = "ytb2audiobot.ytb2audiobot_asynced:main"
+ytb2audiobot = "ytb2audiobot.ytb2audiobot:main"
 
 [tool.setuptools]
 package-data = {"sample" = ["*.dat"]}

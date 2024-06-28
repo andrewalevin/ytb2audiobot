@@ -17,7 +17,7 @@ def get_answer_text(subtitles, selected_index=None):
     index_last = None
     for index_item in selected_index:
         if index_last and index_item - index_last > 1:
-            output_text += '...\n\n'
+            output_text += '...\n'
 
         subtitle_time = time.strftime('%H:%M:%S', time.gmtime(int(subtitles[index_item]['start'])))
         subtitle_text = subtitles[index_item]['text']

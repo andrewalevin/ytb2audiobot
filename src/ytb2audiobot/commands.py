@@ -1,4 +1,5 @@
 from urlextract import URLExtract
+from ytb2audio.ytb2audio import get_youtube_move_id
 
 COMMANDS_SPLIT = [
     {'name': 'split', 'alias': 'split'},
@@ -48,7 +49,7 @@ def is_youtube_url(text):
 
 def get_command_params_of_request(text):
     command_context = dict()
-    command_context['url'] = ''
+    command_context['id'] = ''
     command_context['url_started'] = False
     command_context['name'] = ''
     command_context['params'] = []
@@ -60,17 +61,22 @@ def get_command_params_of_request(text):
         return command_context
 
     urls = URLExtract().find_urls(text)
+    url = ''
     for url in urls:
         url = url.strip()
         if is_youtube_url(url):
             command_context['url'] = url
-    if not command_context['url']:
+            break
+    movie_id = get_youtube_move_id(command_context.get('url'))
+    if not movie_id:
         return command_context
 
-    if text.startswith(command_context.get('url')):
+    command_context['id'] = movie_id
+
+    if text.startswith(url):
         command_context['url_started'] = True
 
-    text = text.replace(command_context.get('url'), '')
+    text = text.replace(url, '')
     text = text.strip()
     text = text.replace('   ', ' ')
     text = text.replace('  ', ' ')
@@ -87,6 +93,10 @@ def get_command_params_of_request(text):
             print('🏺 Found bot')
             command_context['force_download'] = True
             parts = parts[1:]
+            break
+
+    if not parts:
+        return command_context
 
     command_index = -1
     for idx, command in enumerate(ALL_COMMANDS):

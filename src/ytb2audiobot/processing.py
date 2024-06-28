@@ -120,7 +120,17 @@ async def processing_commands(command: dict):
         movie_meta['ytdlprewriteoptions'] = movie_meta.get('ytdlprewriteoptions').replace('48k', f'{param}k')
         movie_meta['additional_meta_text'] = f'{param}k bitrate'
 
-    elif command.get('name') == 'subtitles':
+    movie_meta = await get_movie_meta(movie_meta, movie_id)
+
+    caption_head = CAPTION_HEAD_TEMPLATE.safe_substitute(
+        movieid=movie_meta['id'],
+        title=capital2lower(movie_meta['title']),
+        author=capital2lower(movie_meta['author']),
+        additional=movie_meta['additional']
+    )
+    filename = filename_m4a(movie_meta['title'])
+
+    if command.get('name') == 'subtitles':
         param = ''
         if command.get('params'):
             params = command.get('params')
@@ -131,11 +141,21 @@ async def processing_commands(command: dict):
             context['error'] = f'🟥️ Subtitles. Internal error: {_err}'
             return context
 
-        context['subtitles'] = text
+        caption = Template(caption_head).safe_substitute(partition='', timecodes='', duration='')
+        caption = caption.replace('\n\n\n', '\n')
+        caption = caption.replace('[]', '')
+        top_caption = 'Subtitles'
+        if param:
+            top_caption += f'\nSearch [{param}]'
+        caption = top_caption + '\n\n' + caption.strip()
+
+        context['subtitles'] = {
+            'caption': caption,
+            'text': text,
+            'filename': 'subtitles-' + filename.replace('.m4a', '') + '-' + movie_id + '.txt'
+        }
 
         return context
-
-    movie_meta = await get_movie_meta(movie_meta, movie_id)
 
     tasks = [
         download_audio_by_movie_meta(movie_meta),
@@ -192,13 +212,7 @@ async def processing_commands(command: dict):
     if _err:
         context['warning'] = f'🟠 Timecodes. Error creation.'
 
-    caption_head = CAPTION_HEAD_TEMPLATE.safe_substitute(
-        movieid=movie_meta['id'],
-        title=capital2lower(movie_meta['title']),
-        author=capital2lower(movie_meta['author']),
-        additional=movie_meta['additional']
-    )
-    filename = filename_m4a(movie_meta['title'])
+
 
     context['audio_datas'] = []
 
@@ -223,15 +237,5 @@ async def processing_commands(command: dict):
             'caption': caption if len(caption) < TG_CAPTION_MAX_LONG else caption[:TG_CAPTION_MAX_LONG - 8] + '\n...',
         }
         context['audio_datas'].append(audio_data)
-
-
-    # await bot.delete_message(
-    #    chat_id=command.get('sender_id'),
-    #    message_id=command.get('message_id')
-    # )
-
-    # if not keep_data_files:
-    #    print('🗑❌ Empty Files')
-    #    await delete_files_by_movie_id(data_dir, movie_id)
 
     return context
