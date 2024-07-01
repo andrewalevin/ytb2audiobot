@@ -2,6 +2,8 @@ from pytube import YouTube
 
 
 async def get_movie_meta(movie_meta: dict, movie_id):
+    movie_meta['id'] = movie_id
+
     yt = None
     try:
         yt = YouTube.from_id(movie_id)

@@ -3,15 +3,7 @@ import pathlib
 from datetime import timedelta
 from string import Template
 
-from aiogram import Bot, Dispatcher
-from aiogram.client.default import DefaultBotProperties
-from aiogram.fsm.storage.memory import MemoryStorage
-import os
-from dotenv import load_dotenv
-from telegram.constants import ParseMode
-
-from ytb2audio.ytb2audio import YT_DLP_OPTIONS_DEFAULT, get_youtube_move_id, download_audio_by_movie_meta, \
-    download_thumbnail_by_movie_meta
+from ytb2audio.ytb2audio import YT_DLP_OPTIONS_DEFAULT
 from audio2splitted.audio2splitted import DURATION_MINUTES_MIN, DURATION_MINUTES_MAX, get_split_audio_scheme, \
     make_split_audio
 
@@ -19,19 +11,13 @@ from ytb2audiobot.subtitles import get_subtitles
 from ytb2audiobot.datadir import get_data_dir
 
 from ytb2audiobot.mp4mutagen import get_mp4object
-from ytb2audiobot.pytube import get_movie_meta
 from ytb2audiobot.thumbnail import image_compress_and_resize
 from ytb2audiobot.timecodes import get_timecodes, filter_timestamp_format
 from ytb2audiobot.utils import capital2lower, filename_m4a
 
-storage = MemoryStorage()
+from ytb2audiobot.thumbnail import download_thumbnail_by_movie_meta
 
-dp = Dispatcher(storage=storage)
-
-load_dotenv()
-token = os.environ.get("TG_TOKEN")
-
-bot = Bot(token=token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+from ytb2audiobot.audio import download_audio_by_movie_meta
 
 data_dir = get_data_dir()
 
@@ -59,29 +45,28 @@ $timecodes
 ''')
 
 
-async def processing_commands(command: dict):
+DEFAULT_MOVIE_META = {
+    'id': '',
+    'title': '',
+    'author': '',
+    'description': '',
+    'thumbnail_url': '',
+    'thumbnail_path': None,
+    'additional': '',
+    'duration': 0,
+    'timecodes': [''],
+    'threshold_seconds': AUDIO_SPLIT_THRESHOLD_MINUTES * 60,
+    'split_duration_minutes': 39,
+    'ytdlprewriteoptions': YT_DLP_OPTIONS_DEFAULT,
+    'additional_meta_text': '',
+    'store': data_dir
+}
+
+
+async def processing_commands(command: dict, movie_meta: dict):
     context = dict()
     context['warning'] = ''
     context['error'] = ''
-
-    movie_id = command.get('id')
-
-    movie_meta = dict()
-    movie_meta['id'] = movie_id
-    movie_meta['title'] = ''
-    movie_meta['author'] = ''
-    movie_meta['description'] = ''
-    movie_meta['thumbnail_url'] = ''
-    movie_meta['thumbnail_path'] = None
-    movie_meta['additional'] = ''
-    movie_meta['duration'] = 0
-    movie_meta['timecodes'] = ['']
-
-    movie_meta['threshold_seconds'] = AUDIO_SPLIT_THRESHOLD_MINUTES * 60
-    movie_meta['split_duration_minutes'] = 39
-    movie_meta['ytdlprewriteoptions'] = YT_DLP_OPTIONS_DEFAULT
-    movie_meta['additional_meta_text'] = ''
-    movie_meta['store'] = data_dir
 
     if command.get('name') == 'split':
         if not command.get('params'):
@@ -120,8 +105,6 @@ async def processing_commands(command: dict):
         movie_meta['ytdlprewriteoptions'] = movie_meta.get('ytdlprewriteoptions').replace('48k', f'{param}k')
         movie_meta['additional_meta_text'] = f'{param}k bitrate'
 
-    movie_meta = await get_movie_meta(movie_meta, movie_id)
-
     caption_head = CAPTION_HEAD_TEMPLATE.safe_substitute(
         movieid=movie_meta['id'],
         title=capital2lower(movie_meta['title']),
@@ -136,7 +119,7 @@ async def processing_commands(command: dict):
             params = command.get('params')
             param = ' '.join(params)
 
-        text, _err = await get_subtitles(movie_id, param)
+        text, _err = await get_subtitles(movie_meta.get('id'), param)
         if _err:
             context['error'] = f'🟥️ Subtitles. Internal error: {_err}'
             return context
@@ -152,7 +135,7 @@ async def processing_commands(command: dict):
         context['subtitles'] = {
             'caption': caption,
             'text': text,
-            'filename': 'subtitles-' + filename.replace('.m4a', '') + '-' + movie_id + '.txt'
+            'filename': 'subtitles-' + filename.replace('.m4a', '') + '-' + movie_meta.get('id') + '.txt'
         }
 
         return context
@@ -166,12 +149,16 @@ async def processing_commands(command: dict):
     audio = results[0]
     movie_meta['thumbnail_path'] = results[1]
 
+    print('📊 After Task results: ', results)
+    print()
+
     if not audio.exists():
         context['error'] = f'🔴 Download. Audio file does not exist.'
         return context
 
     if not pathlib.Path(movie_meta['thumbnail_path']).exists():
         context['warning'] = f'🟠 Thumbnail. Not exists.\n'
+        movie_meta['thumbnail_path'] = None
 
     scheme = get_split_audio_scheme(
         source_audio_length=movie_meta['duration'],
@@ -211,8 +198,6 @@ async def processing_commands(command: dict):
     timecodes, _err = await get_timecodes(scheme, movie_meta['description'])
     if _err:
         context['warning'] = f'🟠 Timecodes. Error creation.'
-
-
 
     context['audio_datas'] = []
 
