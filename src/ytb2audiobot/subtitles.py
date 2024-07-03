@@ -1,11 +1,6 @@
 import time
-from string import Template
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled
-
-
-FORMAT_TEMPLATE = Template('<b><s>$text</s></b>')
-ADDITION_ROWS_NUMBER = 1
-IS_TEXT_FORMATTED = True
+from ytb2audiobot import config
 
 
 def get_answer_text(subtitles, selected_index=None):
@@ -51,11 +46,11 @@ def extend_discovered_index(discovered_index, max_length, count_addition_index=1
 
 
 def format_text(text, target):
-    if IS_TEXT_FORMATTED:
-        text = text.replace(target, FORMAT_TEMPLATE.substitute(text=target))
-        text = text.replace(target.capitalize(), FORMAT_TEMPLATE.substitute(text=target.capitalize()))
-        text = text.replace(target.upper(), FORMAT_TEMPLATE.substitute(text=target.upper()))
-        text = text.replace(target.lower(), FORMAT_TEMPLATE.substitute(text=target.lower()))
+    if config.IS_TEXT_FORMATTED:
+        text = text.replace(target, config.FORMAT_TEMPLATE.substitute(text=target))
+        text = text.replace(target.capitalize(), config.FORMAT_TEMPLATE.substitute(text=target.capitalize()))
+        text = text.replace(target.upper(), config.FORMAT_TEMPLATE.substitute(text=target.upper()))
+        text = text.replace(target.lower(), config.FORMAT_TEMPLATE.substitute(text=target.lower()))
     return text
 
 
@@ -74,7 +69,7 @@ async def get_subtitles(movie_id: str, discovered_word: str = ''):
     if not (discovered_index := get_discovered_subtitles_index(subtitles, discovered_word)):
         return 'Nothing Found :)', ''
 
-    discovered_index = extend_discovered_index(discovered_index, len(subtitles), ADDITION_ROWS_NUMBER)
+    discovered_index = extend_discovered_index(discovered_index, len(subtitles), config.ADDITION_ROWS_NUMBER)
 
     text = get_answer_text(subtitles, discovered_index)
 

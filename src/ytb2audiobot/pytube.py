@@ -1,21 +1,23 @@
 from pytube import YouTube
+from ytb2audiobot import config
+from ytb2audiobot.datadir import get_data_dir
 
 
-async def get_movie_meta(movie_meta: dict, movie_id):
+async def get_movie_meta(movie_id):
+    movie_meta = config.DEFAULT_MOVIE_META.copy()
+
     movie_meta['id'] = movie_id
+    movie_meta['store'] = get_data_dir()
 
-    yt = None
     try:
         yt = YouTube.from_id(movie_id)
     except Exception as e:
-        print(f'🟠 {e}\n\n 🟠 Exception. Cant get pytube object. Continue ... ')
-        movie_meta['error'] = e
+        movie_meta['error'] = f'🟠 Exception. Cant get pytube object. \n🟠 {e}\n\n Continue ... '
         return movie_meta
 
     if yt.title:
         movie_meta['title'] = yt.title
 
-    print('💈 Description: ', yt.description)
     if yt.description:
         movie_meta['description'] = yt.description
 
@@ -29,4 +31,3 @@ async def get_movie_meta(movie_meta: dict, movie_id):
         movie_meta['duration'] = yt.length
 
     return movie_meta
-

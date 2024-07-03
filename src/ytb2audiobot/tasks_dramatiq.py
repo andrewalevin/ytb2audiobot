@@ -1,6 +1,5 @@
 import dramatiq
 from dramatiq.brokers.redis import RedisBroker
-
 from ytb2audiobot.processing import processing_commands
 
 redis_broker = RedisBroker()

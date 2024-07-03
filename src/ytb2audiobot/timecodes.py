@@ -2,17 +2,10 @@ import datetime
 import re
 
 from ytb2audiobot.utils import capital2lower
+from ytb2audiobot import config
 
+SYMBOLS_TO_CLEAN = '— – − - = _ |'
 TIMECODES_THRESHOLD_COUNT = 3
-
-MOVIES_TEST_TIMCODES = '''
-Как миграция убивает францию
-https://www.youtube.com/watch?v=iR0ETOSis7Y
-
-Ремизов
-youtu.be/iI3qo1Bxi0o 
-
-'''
 
 
 def clean_timecodes_text(text):
@@ -86,11 +79,6 @@ def filter_timestamp_format(_time):
     _time = _time.replace('@@0:', '@@')
 
     return _time.replace('@@', '').replace('##', '')
-
-
-
-
-SYMBOLS_TO_CLEAN = '— – − - = _ |'
 
 
 def remove_started_symbols(text):

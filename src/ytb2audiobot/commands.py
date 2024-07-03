@@ -1,47 +1,11 @@
 from urlextract import URLExtract
 from ytb2audio.ytb2audio import get_youtube_move_id
-
-COMMANDS_SPLIT = [
-    {'name': 'split', 'alias': 'split'},
-    {'name': 'split', 'alias': 'spl'},
-    {'name': 'split', 'alias': 'sp'},
-]
-
-COMMANDS_BITRATE = [
-    {'name': 'bitrate', 'alias': 'bitrate'},
-    {'name': 'bitrate', 'alias': 'bitr'},
-    {'name': 'bitrate', 'alias': 'bit'},
-]
-
-COMMANDS_SUBTITLES = [
-    {'name': 'subtitles', 'alias': 'subtitles'},
-    {'name': 'subtitles', 'alias': 'subt'},
-    {'name': 'subtitles', 'alias': 'subs'},
-    {'name': 'subtitles', 'alias': 'sub'},
-    {'name': 'subtitles', 'alias': 'su'},
-]
-
-COMMANDS_FORCE_DOWNLOAD = [
-    {'name': 'download', 'alias': 'download'},
-    {'name': 'download', 'alias': 'down'},
-    {'name': 'download', 'alias': 'dow'},
-    {'name': 'download', 'alias': 'd'},
-    {'name': 'download', 'alias': 'bot'},
-    {'name': 'download', 'alias': 'скачать'},
-    {'name': 'download', 'alias': 'скач'},
-    {'name': 'download', 'alias': 'ск'},
-]
-
-ALL_COMMANDS = COMMANDS_SPLIT + COMMANDS_BITRATE + COMMANDS_SUBTITLES
-
-YOUTUBE_DOMAINS = ['youtube.com', 'youtu.be']
-
-PARAMS_MAX_COUNT = 2
+from ytb2audiobot import config
 
 
 def is_youtube_url(text):
 
-    for domain in YOUTUBE_DOMAINS:
+    for domain in config.YOUTUBE_DOMAINS:
         if domain in text:
             return True
     return False
@@ -88,7 +52,7 @@ def get_command_params_of_request(text):
     if not len(parts):
         return command_context
 
-    for idx, command in enumerate(COMMANDS_FORCE_DOWNLOAD):
+    for idx, command in enumerate(config.COMMANDS_FORCE_DOWNLOAD):
         if command.get('alias') == parts[0]:
             print('🏺 Found bot')
             command_context['force_download'] = True
@@ -99,18 +63,18 @@ def get_command_params_of_request(text):
         return command_context
 
     command_index = -1
-    for idx, command in enumerate(ALL_COMMANDS):
+    for idx, command in enumerate(config.ALL_COMMANDS):
         if command.get('alias') == parts[0]:
             command_index = idx
 
     if command_index < 0:
         return command_context
 
-    command_context['name'] = ALL_COMMANDS[command_index].get('name')
+    command_context['name'] = config.ALL_COMMANDS[command_index].get('name')
 
     if len(parts) < 2:
         return command_context
 
-    command_context['params'] = parts[1:PARAMS_MAX_COUNT+1]
+    command_context['params'] = parts[1:config.PARAMS_MAX_COUNT+1]
 
     return command_context

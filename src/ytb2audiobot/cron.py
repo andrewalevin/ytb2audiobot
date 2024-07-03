@@ -1,11 +1,9 @@
 import asyncio
 import datetime
-import pathlib
 
 from ytb2audiobot.datadir import get_data_dir
 from ytb2audiobot.utils import delete_file_async
 
-from ytb2audiobot.utils import async_iterdir
 
 data_dir = get_data_dir()
 

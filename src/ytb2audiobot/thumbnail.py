@@ -1,6 +1,5 @@
 import pathlib
 import ssl
-
 import requests
 from PIL import Image
 
@@ -11,56 +10,63 @@ async def image_compress_and_resize(
         quality: int = 80,
         thumbnail_size=(960, 960)
 ):
-    print('🖼 image_compress_and_resize(): ')
+    if not path:
+        return
+
     path = pathlib.Path(path)
     if not path.exists():
-        return pathlib.Path('none.file')
+        return
 
     image = Image.open(path)
     image.thumbnail(thumbnail_size)
     if not output:
         output = path
     image.save(output, optimize=True, quality=quality)
+
+    return output
+
+
+async def download(url: str, output):
+    output = pathlib.Path(output)
+    ssl._create_default_https_context = ssl._create_stdlib_context
+
+    try:
+        response = requests.get(url, stream=True)
+        if response.status_code == 200:
+            with output.open('wb') as f:
+                f.write(response.content)
+        else:
+            print(f'🟠 Thumbnail. Not a 200 valid code. Response code: {response.status_code}.')
+            return
+    except Exception as e:
+        print(f'🟠 Thumbnail. Failed to download. Exception: {e}.')
+        return
+
     return output
 
 
 async def download_thumbnail_by_movie_meta(movie_meta: dict):
-    print('🥑 Starting downloading thumbnail ... ')
 
     data_dir = pathlib.Path(movie_meta['store'])
 
     data_dir.mkdir(parents=True, exist_ok=True)
-    if not movie_meta['id']:
-        _err = f'🟠 Thumbnail. No ID in movie meta.'
-        print(_err)
-        return 'Error'
 
     thumbnail = data_dir.joinpath(movie_meta['id'] + '-thumbnail.jpg')
 
     if thumbnail.exists():
-        print(f'💚 Thumbnail file yet exists: {thumbnail}')
+        print(f'💕 Thumbnail file yet exists: {thumbnail}')
         return thumbnail
 
     # Special SSL setting to make valid HTTP request to Youtube server.
     ssl._create_default_https_context = ssl._create_stdlib_context
 
-    print('🦠 URL to download: ', movie_meta['thumbnail_url'])
-
-    try:
-        response = requests.get(movie_meta['thumbnail_url'], stream=True)
-        if response.status_code == 200:
-            with thumbnail.open('wb') as f:
-                f.write(response.content)
-        else:
-            _err = f'🟠 Thumbnail. Not a 200 valid code. Response code: {response.status_code}.'
-            print(_err)
-            return 'Error'
-    except Exception as e:
-        _err = f'🟠 Thumbnail. Failed to download. Exception: {e}.'
-        print(_err)
-        return 'Error'
+    thumbnail = await download(movie_meta['thumbnail_url'], thumbnail)
+    if not thumbnail:
+        thumbnail = await download(movie_meta['thumbnail_url'], thumbnail)
+    if not thumbnail:
+        return
 
     if not thumbnail.exists():
-        return pathlib.Path('none.file')
+        return
 
     return thumbnail
