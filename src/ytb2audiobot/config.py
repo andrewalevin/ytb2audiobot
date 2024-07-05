@@ -76,6 +76,10 @@ DEFAULT_MOVIE_META = {
     'store': pathlib.Path('data')
 }
 
+TELEGRAM_MAX_AUDIO_BOT_FILE_SIZE_BYTES_BINARY = 46000000
+TELEGRAM_MAX_AUDIO_BOT_FILE_SIZE_BYTES_BINARY = 3000000
+
+
 
 ###### Commands
 
@@ -97,6 +101,12 @@ COMMANDS_SUBTITLES = [
     {'name': 'subtitles', 'alias': 'subs'},
     {'name': 'subtitles', 'alias': 'sub'},
     {'name': 'subtitles', 'alias': 'su'},
+    {'name': 'subtitles', 'alias': 'саб'},
+    {'name': 'subtitles', 'alias': 'сабы'},
+    {'name': 'subtitles', 'alias': 'субтитры'},
+    {'name': 'subtitles', 'alias': 'субт'},
+    {'name': 'subtitles', 'alias': 'суб'},
+    {'name': 'subtitles', 'alias': 'сб'},
 ]
 
 COMMANDS_FORCE_DOWNLOAD = [
@@ -140,6 +150,8 @@ https://www.youtube.com/watch?v=iR0ETOSis7Y
 youtu.be/iI3qo1Bxi0o 
 
 '''
+
+
 
 
 

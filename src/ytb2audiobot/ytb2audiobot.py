@@ -3,7 +3,6 @@ import os
 import argparse
 import asyncio
 import logging
-import pathlib
 import sys
 import time
 
@@ -61,21 +60,14 @@ async def processing_download(command_context: dict):
 
     predict_time = predict_downloading_time(movie_meta.get('duration'))
 
-    post_status = await post_status.edit_text(
-        text=f'⏳ Downloading ~{seconds_to_human_readable(predict_time)} ... ')
+    if command_context.get('name') != 'subtitles':
+        post_status = await post_status.edit_text(
+            text=f'⏳ Downloading ~ {seconds_to_human_readable(predict_time)} ... ')
 
     stopwatch_time = time.perf_counter()
     task = asyncio.create_task(processing_commands(command_context, movie_meta))
     result = await asyncio.wait_for(task, timeout=config.TASK_TIMEOUT_SECONDS)
-
-    print(f'💚 Processing Result: ', result)
-    print()
-
-    if result.get('error'):
-        return await post_status.edit_text('🟥 Error Processing. ' + result.get('error'))
-
-    if result.get('warning'):
-        await post_status.edit_text('🟠 Warning: ' + result.get('warning'))
+    print(f'💚 Processing Result: ', result, '\n')
 
     await post_status.edit_text('⌛️ Uploading to Telegram ... ')
 
@@ -118,13 +110,9 @@ async def processing_download(command_context: dict):
         if idx != len(result.get('audio_datas')) - 1:
             await asyncio.sleep(math.floor(8 * math.log10(len(result.get('audio_datas')) - 1)))
 
-    stopwatch_time = time.perf_counter() - stopwatch_time
-
-    text = (f'🕰 Predicted: {seconds_to_human_readable(predict_time)}\n'
-            f'🕰 Actual: {seconds_to_human_readable(int(stopwatch_time))}')
-    await post_status.edit_text(text)
-
-    if not result.get('error') and not result.get('warning') and not config.DEV:
+    if result.get('error') or result.get('warning'):
+        await post_status.edit_text('🟥 Error or 🟠 Warning: \n' + result.get('warning') + '\n\n' + result.get('error'))
+    else:
         await post_status.delete()
 
 

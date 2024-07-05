@@ -5,15 +5,15 @@ from string import Template
 from audio2splitted.audio2splitted import DURATION_MINUTES_MIN, DURATION_MINUTES_MAX, get_split_audio_scheme, \
     make_split_audio
 
-from ytb2audiobot.subtitles import get_subtitles
 
+from ytb2audiobot import config
+from ytb2audiobot.subtitles import get_subtitles
 from ytb2audiobot.mp4mutagen import get_mp4object
 from ytb2audiobot.thumbnail import image_compress_and_resize
 from ytb2audiobot.timecodes import get_timecodes, filter_timestamp_format
-from ytb2audiobot.utils import capital2lower, filename_m4a
 from ytb2audiobot.thumbnail import download_thumbnail_by_movie_meta
 from ytb2audiobot.audio import download_audio_by_movie_meta
-from ytb2audiobot import config
+from ytb2audiobot.utils import capital2lower, filename_m4a, remove_m4a_file_if_exists, get_file_size
 
 keep_data_files = False
 
@@ -57,6 +57,8 @@ async def processing_commands(command: dict, movie_meta: dict):
             context['error'] = (f'🟥️ Bitrate. Param {param} is out of [{config.AUDIO_BITRATE_MIN},'
                                 f' ... , {config.AUDIO_BITRATE_MAX}]')
             return context
+
+        await remove_m4a_file_if_exists(movie_meta.get('id'), movie_meta['store'])
 
         movie_meta['ytdlprewriteoptions'] = movie_meta.get('ytdlprewriteoptions').replace('48k', f'{param}k')
         movie_meta['additional_meta_text'] = f'{param}k bitrate'
@@ -164,9 +166,8 @@ async def processing_commands(command: dict, movie_meta: dict):
             'audio_filename': filename if len(audios) == 1 else f'p{idx}_of{len(audios)} {filename}',
             'duration': audio_part['duration'],
             'thumbnail_path': movie_meta['thumbnail_path'],
-            'caption': caption if len(caption) < config.TG_CAPTION_MAX_LONG else caption[:config.TG_CAPTION_MAX_LONG - 8] + '\n...',
+            'caption': caption if len(caption) < config.TG_CAPTION_MAX_LONG else caption[:config.TG_CAPTION_MAX_LONG - 32] + ' … ✂️ (max caption length)',
         }
         context['audio_datas'].append(audio_data)
-
 
     return context

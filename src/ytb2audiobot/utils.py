@@ -33,6 +33,22 @@ async def delete_file_async(path: Path):
         print(f"🔴 Delete file async. Error: {e}")
 
 
+async def get_files_by_movie_id(movie_id: str, folder):
+    folder = pathlib.Path(folder)
+    return list(filter(lambda f: (f.name.startswith(movie_id)), folder.iterdir()))
+
+
+async def remove_m4a_file_if_exists(movie_id, store):
+    movie_ids_files = await get_files_by_movie_id(movie_id, store)
+    m4a_files = list(filter(lambda f: (f.name.endswith('.m4a')), movie_ids_files))
+    if m4a_files:
+        print('💕 m4a_files: ', m4a_files)
+        print('🚮🗑 Remove file in new bitrate')
+        for f in m4a_files:
+            print('\t', '🔹', f.name)
+            f.unlink()
+
+
 async def async_iterdir(directory):
     directory = pathlib.Path(directory)
     async with aiofiles.open(directory.as_posix()) as dir_handle:
@@ -96,3 +112,11 @@ def seconds_to_human_readable(seconds):
         return f"{minutes}m {seconds}s"
     else:
         return f"{seconds}s"
+
+
+async def get_file_size(path):
+    path = pathlib.Path(path)
+    async with aiofiles.open(path.as_posix(), 'r'):
+        file_size = aiofiles.os.path.getsize(path.as_posix())
+    return file_size
+
