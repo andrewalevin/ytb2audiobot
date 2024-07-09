@@ -77,6 +77,8 @@ async def processing_download(command_context: dict):
             subtitles=result.get('subtitles').get('text'))
 
         if len(full_caption) >= config.TELEGRAM_MAX_MESSAGE_TEXT_SIZE:
+            full_caption = full_caption.replace('<b><s><b><s>', '🔹')
+            full_caption = full_caption.replace('</s></b></s></b>', '🔹')
             await bot.send_document(
                 chat_id=sender_id,
                 reply_to_message_id=message_id,

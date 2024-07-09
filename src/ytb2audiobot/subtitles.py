@@ -67,7 +67,7 @@ async def get_subtitles(movie_id: str, discovered_word: str = ''):
         return text, ''
 
     if not (discovered_index := get_discovered_subtitles_index(subtitles, discovered_word)):
-        return 'Nothing Found :)', ''
+        return '🔦 Nothing Found! 😉', ''
 
     discovered_index = extend_discovered_index(discovered_index, len(subtitles), config.ADDITION_ROWS_NUMBER)
 

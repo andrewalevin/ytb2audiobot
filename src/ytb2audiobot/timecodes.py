@@ -81,18 +81,21 @@ def filter_timestamp_format(_time):
     return _time.replace('@@', '').replace('##', '')
 
 
-def remove_started_symbols(text):
-    text = text.strip()
-    text = f'@@@{text}'
-    for _ in range(5):
-        for symb in SYMBOLS_TO_CLEAN.split(' '):
-            text = text.replace(f'@@@{symb}', '@@@')
-            text = text.strip()
-    return text.strip().replace('@@@', '').strip()
+TIMECODE_PATTERN = r'(\d?:?\d+:\d+)'
+
+STRIP_CHARS = ' #$%&@()*+-[\\]^_`{|}~'
+DOTS_CHARS = '.,;:?!'
 
 
 def get_timestamps_group(text, scheme):
-    timestamps_findall_results = re.findall(r'(\d*:?\d+:\d+)\s+(.+)', text)
+    timestamps_findall_results = []
+    for row in text.split('\n'):
+        if not (matched := re.findall(TIMECODE_PATTERN, row)):
+            continue
+        title = row.replace(matched[0], '')
+        title = title.strip(STRIP_CHARS).lstrip(DOTS_CHARS)
+        timestamps_findall_results.append([matched[0], title])
+
     if not timestamps_findall_results:
         return ['' for _ in range(len(scheme))]
 
@@ -106,7 +109,6 @@ def get_timestamps_group(text, scheme):
                 continue
             time = filter_timestamp_format(datetime.timedelta(seconds=stamp.get('time') - part[0]))
             title = capital2lower(stamp.get('title'))
-            title = remove_started_symbols(title)
             output_rows.append(f'{time} - {title}')
         timestamps_group.append('\n'.join(output_rows))
 

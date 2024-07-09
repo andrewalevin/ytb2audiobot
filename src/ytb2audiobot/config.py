@@ -58,6 +58,7 @@ $author
 $timecodes
 ''')
 
+CAPTION_TRIMMED_END_TEXT = ' …\n…\n[⚔️ max caption length]'
 
 DEFAULT_MOVIE_META = {
     'id': '',
@@ -87,16 +88,24 @@ COMMANDS_SPLIT = [
     {'name': 'split', 'alias': 'split'},
     {'name': 'split', 'alias': 'spl'},
     {'name': 'split', 'alias': 'sp'},
+    {'name': 'split', 'alias': 'разделить'},
+    {'name': 'split', 'alias': 'раздел'},
+    {'name': 'split', 'alias': 'разд'},
+    {'name': 'split', 'alias': 'раз'},
 ]
 
 COMMANDS_BITRATE = [
     {'name': 'bitrate', 'alias': 'bitrate'},
     {'name': 'bitrate', 'alias': 'bitr'},
     {'name': 'bitrate', 'alias': 'bit'},
+    {'name': 'bitrate', 'alias': 'битрейт'},
+    {'name': 'bitrate', 'alias': 'битр'},
+    {'name': 'bitrate', 'alias': 'бит'},
 ]
 
 COMMANDS_SUBTITLES = [
     {'name': 'subtitles', 'alias': 'subtitles'},
+    {'name': 'subtitles', 'alias': 'subtitle'},
     {'name': 'subtitles', 'alias': 'subt'},
     {'name': 'subtitles', 'alias': 'subs'},
     {'name': 'subtitles', 'alias': 'sub'},

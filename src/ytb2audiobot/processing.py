@@ -85,10 +85,11 @@ async def processing_commands(command: dict, movie_meta: dict):
         caption = Template(caption_head).safe_substitute(partition='', timecodes='', duration='')
         caption = caption.replace('\n\n\n', '\n')
         caption = caption.replace('[]', '')
-        top_caption = 'Subtitles'
+
+        caption_subtitles = '📝 Subtitles'
         if param:
-            top_caption += f'\nSearch [{param}]'
-        caption = top_caption + '\n\n' + caption.strip()
+            caption_subtitles += f' 🔎 Search [{param}]'
+        caption = caption.strip() + '\n\n' + caption_subtitles
 
         context['subtitles'] = {
             'caption': caption,
@@ -97,9 +98,6 @@ async def processing_commands(command: dict, movie_meta: dict):
         }
 
         return context
-
-    print('🌍 Movie meta: ', movie_meta)
-    print()
 
     tasks = [
         download_audio_by_movie_meta(movie_meta),
@@ -123,6 +121,7 @@ async def processing_commands(command: dict, movie_meta: dict):
         threshold_seconds=movie_meta['threshold_seconds']
     )
     print('🌈 Scheme: ', scheme, '\n')
+
 
     tasks = [
         image_compress_and_resize(movie_meta['thumbnail_path']),
@@ -153,10 +152,11 @@ async def processing_commands(command: dict, movie_meta: dict):
     for idx, audio_part in enumerate(audios, start=1):
         print('💜 Idx: ', idx, 'part: ', audio_part)
 
+        # Add additional seconds to total duration to disable timecode link
         caption = Template(caption_head).safe_substitute(
             partition='' if len(audios) == 1 else f'[Part {idx} of {len(audios)}]',
             timecodes=timecodes[idx-1],
-            duration=filter_timestamp_format(timedelta(seconds=audio_part.get('duration')))
+            duration=filter_timestamp_format(timedelta(seconds=audio_part.get('duration')+1))
         )
 
         audio_data = {
@@ -166,7 +166,7 @@ async def processing_commands(command: dict, movie_meta: dict):
             'audio_filename': filename if len(audios) == 1 else f'p{idx}_of{len(audios)} {filename}',
             'duration': audio_part['duration'],
             'thumbnail_path': movie_meta['thumbnail_path'],
-            'caption': caption if len(caption) < config.TG_CAPTION_MAX_LONG else caption[:config.TG_CAPTION_MAX_LONG - 32] + ' … ✂️ (max caption length)',
+            'caption': caption if len(caption) < config.TG_CAPTION_MAX_LONG else caption[:config.TG_CAPTION_MAX_LONG - 32] + config.CAPTION_TRIMMED_END_TEXT,
         }
         context['audio_datas'].append(audio_data)
 
