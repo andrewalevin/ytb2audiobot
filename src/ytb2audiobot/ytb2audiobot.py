@@ -225,6 +225,7 @@ def main():
                         help=f'Timeout for telegram callback button in channel. '
                              f'Range [{config.TELEGRAM_CALLBACK_BUTTON_TIMEOUT_SECONDS_MIN}, '
                              f'{config.TELEGRAM_CALLBACK_BUTTON_TIMEOUT_SECONDS_MAX}] ')
+    parser.add_argument('--dev', default=False, action=argparse.BooleanOptionalAction)
 
     # todo
     # threshold_seconds': AUDIO_SPLIT_THRESHOLD_MINUTES * 60,
@@ -259,8 +260,11 @@ def main():
             return
         contextbot['callback_button_timeout_seconds'] = value
 
-    for file in data_dir.iterdir():
-        file.unlink()
+    if not args.dev:
+        for file in data_dir.iterdir():
+            file.unlink()
+    else:
+        print('DEV mode')
 
     asyncio.run(start_bot())
 

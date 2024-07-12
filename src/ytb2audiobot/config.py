@@ -52,13 +52,15 @@ TASK_TIMEOUT_SECONDS = 60 * 30
 
 CAPTION_HEAD_TEMPLATE = Template('''
 $partition $title
-<a href=\"youtu.be/$movieid\">youtu.be/$movieid</a> [$duration] $additional
-$author
+<a href=\"youtu.be/$movieid\">youtu.be/$movieid</a> [$duration]
+$author $additional
 
 $timecodes
 ''')
 
-CAPTION_TRIMMED_END_TEXT = ' …\n…\n[⚔️ max caption length]'
+CAPTION_TRIMMED_END_TEXT = '…\n…\n⚔️ [chunked due to max telegram caption length]'
+
+ADDITIONAL_INFO_FORCED_SPLITTED = '\n\n🎏 [forced splitted due to max orig file size]'
 
 DEFAULT_MOVIE_META = {
     'id': '',
@@ -160,6 +162,8 @@ youtu.be/iI3qo1Bxi0o
 
 '''
 
+
+TELEGRAM_BOT_FILE_MAX_SIZE_BYTES = 47000000
 
 
 

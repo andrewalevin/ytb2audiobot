@@ -1,4 +1,5 @@
 import asyncio
+import math
 from datetime import timedelta
 from string import Template
 
@@ -61,13 +62,12 @@ async def processing_commands(command: dict, movie_meta: dict):
         await remove_m4a_file_if_exists(movie_meta.get('id'), movie_meta['store'])
 
         movie_meta['ytdlprewriteoptions'] = movie_meta.get('ytdlprewriteoptions').replace('48k', f'{param}k')
-        movie_meta['additional_meta_text'] = f'{param}k bitrate'
+        movie_meta['additional_meta_text'] = f'\n{param}k bitrate'
 
     caption_head = config.CAPTION_HEAD_TEMPLATE.safe_substitute(
         movieid=movie_meta['id'],
         title=capital2lower(movie_meta['title']),
         author=capital2lower(movie_meta['author']),
-        additional=movie_meta['additional']
     )
     filename = filename_m4a(movie_meta['title'])
 
@@ -82,7 +82,7 @@ async def processing_commands(command: dict, movie_meta: dict):
             context['error'] = f'🟥️ Subtitles. Internal error: {_err}'
             return context
 
-        caption = Template(caption_head).safe_substitute(partition='', timecodes='', duration='')
+        caption = Template(caption_head).safe_substitute(partition='', timecodes='', duration='', additional='')
         caption = caption.replace('\n\n\n', '\n')
         caption = caption.replace('[]', '')
 
@@ -113,15 +113,23 @@ async def processing_commands(command: dict, movie_meta: dict):
         context['error'] = f'🔴 Download. Audio file does not exist.'
         return context
 
+    duration_seconds = movie_meta['split_duration_minutes'] * 60
+
+    size = await get_file_size(audio)
+    if size and size > config.TELEGRAM_BOT_FILE_MAX_SIZE_BYTES:
+        number_parts = math.ceil(size / config.TELEGRAM_BOT_FILE_MAX_SIZE_BYTES)
+        duration_seconds = movie_meta['duration'] // number_parts
+        movie_meta['threshold_seconds'] = 1
+        movie_meta['additional_meta_text'] = config.ADDITIONAL_INFO_FORCED_SPLITTED
+
     scheme = get_split_audio_scheme(
         source_audio_length=movie_meta['duration'],
-        duration_seconds=movie_meta['split_duration_minutes'] * 60,
+        duration_seconds=duration_seconds,
         delta_seconds=config.AUDIO_SPLIT_DELTA_SECONDS,
         magic_tail=True,
         threshold_seconds=movie_meta['threshold_seconds']
     )
     print('🌈 Scheme: ', scheme, '\n')
-
 
     tasks = [
         image_compress_and_resize(movie_meta['thumbnail_path']),
@@ -156,7 +164,8 @@ async def processing_commands(command: dict, movie_meta: dict):
         caption = Template(caption_head).safe_substitute(
             partition='' if len(audios) == 1 else f'[Part {idx} of {len(audios)}]',
             timecodes=timecodes[idx-1],
-            duration=filter_timestamp_format(timedelta(seconds=audio_part.get('duration')+1))
+            duration=filter_timestamp_format(timedelta(seconds=audio_part.get('duration')+1)),
+            additional=movie_meta['additional_meta_text']
         )
 
         audio_data = {

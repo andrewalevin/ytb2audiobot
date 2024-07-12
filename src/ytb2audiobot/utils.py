@@ -74,14 +74,16 @@ async def get_creation_time_async(path):
         return None
 
 
+def make_first_capital(text):
+    return text[0].upper() + text[1:]
+
+
 def capital2lower(text):
     count_capital = sum(1 for char in text if char.isupper())
     if count_capital / len(text) < CAPITAL_LETTERS_PERCENT_THRESHOLD:
-        return text
+        return make_first_capital(text)
 
-    text = text.lower()
-    text = text[0].upper() + text[1:]
-    return text
+    return make_first_capital(text.lower())
 
 
 def filename_m4a(text):
@@ -114,9 +116,34 @@ def seconds_to_human_readable(seconds):
         return f"{seconds}s"
 
 
-async def get_file_size(path):
+async def get_file_size0(path):
     path = pathlib.Path(path)
     async with aiofiles.open(path.as_posix(), 'r'):
         file_size = aiofiles.os.path.getsize(path.as_posix())
     return file_size
 
+
+async def get_file_size1(path):
+    path = pathlib.Path(path)
+    print('⛺️: ', path)
+    print(path.as_posix())
+    print()
+
+    file_stat = await aiofiles.os.stat(str(path.as_posix))
+    file_size = file_stat.st_size
+
+    return file_size
+
+
+async def get_file_size(file_path):
+    size = 0
+    try:
+        async with aiofiles.open(file_path, mode='rb') as f:
+            # Move the cursor to the end of the file
+            await f.seek(0, os.SEEK_END)
+            # Get the current position of the cursor, which is the size of the file
+            size = await f.tell()
+    except Exception as e:
+        return 0
+
+    return size

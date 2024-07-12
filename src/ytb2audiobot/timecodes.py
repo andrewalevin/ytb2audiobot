@@ -83,7 +83,7 @@ def filter_timestamp_format(_time):
 
 TIMECODE_PATTERN = r'(\d?:?\d+:\d+)'
 
-STRIP_CHARS = ' #$%&@()*+-[\\]^_`{|}~'
+STRIP_CHARS = ' #$%&@()*+[\\]^_`{|}~--−–—'
 DOTS_CHARS = '.,;:?!'
 
 
@@ -109,6 +109,7 @@ def get_timestamps_group(text, scheme):
                 continue
             time = filter_timestamp_format(datetime.timedelta(seconds=stamp.get('time') - part[0]))
             title = capital2lower(stamp.get('title'))
+
             output_rows.append(f'{time} - {title}')
         timestamps_group.append('\n'.join(output_rows))
 
