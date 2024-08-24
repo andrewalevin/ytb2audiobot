@@ -31,6 +31,7 @@ async def send_welcome(message: types.Message):
 @dp.callback_query(lambda c: c.data == 'button_pressed')
 async def process_callback(callback_query: types.CallbackQuery):
     # Acknowledge the callback query
+    global bot
     await bot.answer_callback_query(callback_query.id, text='🥶 Button pressed!')
 
     # Optionally, you can send a message or edit the current message

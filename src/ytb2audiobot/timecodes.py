@@ -82,16 +82,30 @@ def filter_timestamp_format(_time):
 
 
 TIMECODE_PATTERN = r'(\d?:?\d+:\d+)'
+TIMECODE_PATTERN = r'(\d*:*\d+:+\d+)'
+
 
 STRIP_CHARS = ' #$%&@()*+[\\]^_`{|}~--−–—'
 DOTS_CHARS = '.,;:?!'
 
 
+def get_matched(text):
+    print('🍷 Text: ', text)
+    matched = re.findall(TIMECODE_PATTERN, text)
+    print('🍷🍷 Matched: ', matched)
+
+    return matched
+
+
 def get_timestamps_group(text, scheme):
+    print('🍕 get_timestamps_group : ', text)
+    print()
+
     timestamps_findall_results = []
     for row in text.split('\n'):
         if not (matched := re.findall(TIMECODE_PATTERN, row)):
             continue
+
         title = row.replace(matched[0], '')
         title = title.strip(STRIP_CHARS).lstrip(DOTS_CHARS)
         timestamps_findall_results.append([matched[0], title])
@@ -125,7 +139,7 @@ def get_timecodes_text(description):
         return ''
 
     for part in description[0].split('\n\n'):
-        matches = re.compile(r'(\d{1,2}:\d{2})').findall(part)
+        matches = re.findall(TIMECODE_PATTERN, part)
         if len(matches) > TIMECODES_THRESHOLD_COUNT:
             return clean_timecodes_text(part)
 

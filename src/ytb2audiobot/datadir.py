@@ -1,15 +1,31 @@
 import pathlib
 import tempfile
-from ytb2audiobot import config
+import zlib
 
+from ytb2audiobot import config
+import hashlib
+
+
+def get_md5(data, length=999999999):
+    md5_hash = hashlib.md5()
+    md5_hash.update(data.encode('utf-8'))
+    return md5_hash.hexdigest()[:length]
+
+def get_hash_adler32(text):
+    return zlib.adler32(text.encode('utf-8'))
 
 def get_data_dir():
+    _hash = hex(get_hash_adler32(pathlib.Path.cwd().as_posix()))[-8:]
     temp_dir = pathlib.Path(tempfile.gettempdir())
     if temp_dir.exists():
-        data_dir = temp_dir.joinpath(config.DIRNAME_IN_TEMPDIR)
+        data_dir = temp_dir.joinpath(f'{config.DIRNAME_IN_TEMPDIR}-{_hash}')
         data_dir.mkdir(parents=True, exist_ok=True)
 
         symlink = pathlib.Path(config.DIRNAME_DATA)
+
+        if symlink.resolve() != data_dir.resolve():
+            symlink.unlink()
+
         if not symlink.exists():
             symlink.symlink_to(data_dir)
 
@@ -20,7 +36,7 @@ def get_data_dir():
             try:
                 data_dir.unlink()
             except Exception as e:
-                print(f'Error symlink unlink: {e}')
+                print(f'❌ Error symlink unlink: {e}')
 
         data_dir.mkdir(parents=True, exist_ok=True)
 

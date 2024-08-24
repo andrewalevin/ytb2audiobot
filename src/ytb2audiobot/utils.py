@@ -6,7 +6,7 @@ from pathlib import Path
 
 import aiofiles
 import aiofiles.os
-
+import xxhash
 
 CAPITAL_LETTERS_PERCENT_THRESHOLD = 0.3
 
@@ -123,6 +123,19 @@ async def get_file_size0(path):
     return file_size
 
 
+async def read_file(path):
+    path = pathlib.Path(path)
+    async with aiofiles.open(path.resolve(), 'r') as file:
+        contents = await file.read()
+    return contents
+
+
+async def write_file(path, data):
+    path = pathlib.Path(path)
+    async with aiofiles.open(path.resolve(), 'w') as file:
+        await file.write(data)
+
+
 async def get_file_size1(path):
     path = pathlib.Path(path)
     print('⛺️: ', path)
@@ -147,3 +160,27 @@ async def get_file_size(file_path):
         return 0
 
     return size
+
+
+def get_hash(data):
+    if not isinstance(data, str):
+        data = str(data)
+
+    return xxhash.xxh64(data.encode('utf-8')).hexdigest()
+
+
+async def check_autodownload_hashs(ids_dict):
+    pass
+
+
+async def run_command(cmd):
+    process = await asyncio.create_subprocess_shell(
+        cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+
+    stdout, stderr = await process.communicate()
+
+    return stdout.decode(), stderr.decode(), process.returncode
+

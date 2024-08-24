@@ -10,8 +10,11 @@ async def get_movie_meta(movie_id):
     movie_meta['store'] = get_data_dir()
 
     try:
+        print('🌵 Init Putybe')
         yt = YouTube.from_id(movie_id)
     except Exception as e:
+        print('🍅 Exception in Pytube Youtube!')
+
         movie_meta['error'] = f'🟠 Exception. Cant get pytube object. \n🟠 {e}\n\n Continue ... '
         return movie_meta
 

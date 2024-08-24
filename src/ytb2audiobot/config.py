@@ -32,7 +32,7 @@ $subtitles
 
 TELEGRAM_MAX_MESSAGE_TEXT_SIZE = 4096 - 4
 
-TASK_TIMEOUT_SECONDS = 60 * 30
+TASK_TIMEOUT_SECONDS = 60 * 180
 
 
 # processing
@@ -165,6 +165,8 @@ youtu.be/iI3qo1Bxi0o
 
 TELEGRAM_BOT_FILE_MAX_SIZE_BYTES = 47000000
 
+TIMERS_FILE_PATH = pathlib.Path('timers.log')
 
+AUTODOWNLOAD_CHAT_IDS_HASHED_PATH = pathlib.Path('autodownload_chat_ids_hashed.txt')
 
 

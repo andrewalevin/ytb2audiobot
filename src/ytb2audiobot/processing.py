@@ -115,13 +115,6 @@ async def processing_commands(command: dict, movie_meta: dict):
 
     duration_seconds = movie_meta['split_duration_minutes'] * 60
 
-    size = await get_file_size(audio)
-    if size and size > config.TELEGRAM_BOT_FILE_MAX_SIZE_BYTES:
-        number_parts = math.ceil(size / config.TELEGRAM_BOT_FILE_MAX_SIZE_BYTES)
-        duration_seconds = movie_meta['duration'] // number_parts
-        movie_meta['threshold_seconds'] = 1
-        movie_meta['additional_meta_text'] = config.ADDITIONAL_INFO_FORCED_SPLITTED
-
     scheme = get_split_audio_scheme(
         source_audio_length=movie_meta['duration'],
         duration_seconds=duration_seconds,
@@ -129,6 +122,20 @@ async def processing_commands(command: dict, movie_meta: dict):
         magic_tail=True,
         threshold_seconds=movie_meta['threshold_seconds']
     )
+    if len(scheme) == 1:
+        size = await get_file_size(audio)
+        if size and size > config.TELEGRAM_BOT_FILE_MAX_SIZE_BYTES:
+            number_parts = math.ceil(size / config.TELEGRAM_BOT_FILE_MAX_SIZE_BYTES)
+            movie_meta['additional_meta_text'] = config.ADDITIONAL_INFO_FORCED_SPLITTED
+
+            scheme = get_split_audio_scheme(
+                source_audio_length=movie_meta['duration'],
+                duration_seconds=movie_meta['duration'] // number_parts,
+                delta_seconds=config.AUDIO_SPLIT_DELTA_SECONDS,
+                magic_tail=True,
+                threshold_seconds=1
+            )
+
     print('🌈 Scheme: ', scheme, '\n')
 
     tasks = [
