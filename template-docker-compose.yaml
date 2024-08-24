@@ -1,0 +1,9 @@
+
+services:
+  ytb2audiobot:
+    image: andrewlevin/ytb2audiobot
+    environment:
+      - BOT_TOKEN=YOUR_BOT_TOKEN
+      - SALT=YOUR_SALT
+    restart: on-failure:3
+

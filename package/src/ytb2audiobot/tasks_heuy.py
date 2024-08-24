@@ -1,7 +1,7 @@
 from huey import SqliteHuey
 from ytb2audiobot.processing import processing_commands
 
-huey = SqliteHuey(filename='../../huey-table.db')
+huey = SqliteHuey(filename='../../../dev/huey-table.db')
 
 
 @huey.task()

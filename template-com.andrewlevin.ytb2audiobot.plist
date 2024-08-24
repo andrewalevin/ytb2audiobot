@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.andrewlevin.ytb2audiobot.plist</string>
+
+    <!-- Path to the Python interpreter -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-c</string>
+        <string>cd ROOT_DIR &amp;&amp; source venv/bin/activate &amp;&amp; export PATH="/opt/homebrew/bin:$PATH" &amp;&amp; ytb2audiobot --dev 2>&amp;1 </string>
+    </array>
+
+
+    <!-- Start the script at startup -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Keep the script running -->
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>RestartOnFailure</key>
+    <true/>
+
+    <!-- Log output to files (optional) -->
+    <key>StandardOutPath</key>
+    <string>ROOT_DIR/log.log</string>
+    <key>StandardErrorPath</key>
+    <string>ROOT_DIR/errors.log</string>
+</dict>
+</plist>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.andrewlevin.ytb2audiobot.plist</string>
+
+    <!-- Path to the Python interpreter -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-c</string>
+        <string>cd ROOT_DIR &amp;&amp; source venv/bin/activate &amp;&amp; export PATH="/opt/homebrew/bin:$PATH" &amp;&amp; ytb2audiobot --dev 2>&amp;1 </string>
+    </array>
+
+
+    <!-- Start the script at startup -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Keep the script running -->
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>RestartOnFailure</key>
+    <true/>
+
+    <!-- Log output to files (optional) -->
+    <key>StandardOutPath</key>
+    <string>ROOT_DIR/log.log</string>
+    <key>StandardErrorPath</key>
+    <string>ROOT_DIR/errors.log</string>
+</dict>
+</plist>

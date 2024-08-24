@@ -1,0 +1,15 @@
+[Unit]
+Description=Ytb2Audiobot Service
+After=network.target
+
+[Service]
+Type=simplex
+WorkingDirectory=ROOT_DIR
+ExecStart=/bin/bash -c 'cd ROOT_DIR && source venv/bin/activate && ytb2audiobot'
+StandardOutput=append:ROOT_DIR/log.log
+StandardError=append:ROOT_DIR/errors.log
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
