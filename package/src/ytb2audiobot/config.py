@@ -1,3 +1,4 @@
+import logging
 import pathlib
 from string import Template
 
@@ -96,6 +97,14 @@ COMMANDS_SPLIT = [
     {'name': 'split', 'alias': 'раз'},
 ]
 
+COMMANDS_SPLIT_BY_TIMECODES = [
+    {'name': 'splittimecodes', 'alias': 'timecodes'},
+    {'name': 'splittimecodes', 'alias': 'timecode'},
+    {'name': 'splittimecodes', 'alias': 'time'},
+    {'name': 'splittimecodes', 'alias': 'tm'},
+    {'name': 'splittimecodes', 'alias': 't'},
+]
+
 COMMANDS_BITRATE = [
     {'name': 'bitrate', 'alias': 'bitrate'},
     {'name': 'bitrate', 'alias': 'bitr'},
@@ -131,7 +140,13 @@ COMMANDS_FORCE_DOWNLOAD = [
     {'name': 'download', 'alias': 'ск'},
 ]
 
-ALL_COMMANDS = COMMANDS_SPLIT + COMMANDS_BITRATE + COMMANDS_SUBTITLES
+COMMANDS_QUOTE = [
+    {'name': 'quote', 'alias': 'quote'},
+    {'name': 'quote', 'alias': 'qu'},
+    {'name': 'quote', 'alias': 'q'},
+]
+
+ALL_COMMANDS = COMMANDS_SPLIT + COMMANDS_BITRATE + COMMANDS_SUBTITLES + COMMANDS_QUOTE
 
 YOUTUBE_DOMAINS = ['youtube.com', 'youtu.be']
 
@@ -141,7 +156,7 @@ PARAMS_MAX_COUNT = 2
 # datadir
 
 DIRNAME_IN_TEMPDIR = 'pip-ytb2audiobot-data'
-DIRNAME_DATA = 'data-ytb2audiobot'
+DIRNAME_DATA = 'data'
 
 
 # subtitles
@@ -169,4 +184,6 @@ TIMERS_FILE_PATH = pathlib.Path('timers.log')
 
 AUTODOWNLOAD_CHAT_IDS_HASHED_PATH = pathlib.Path('autodownload_chat_ids_hashed.txt')
 
+LOG_LEVEL = logging.DEBUG
 
+DEFAULT_TELEGRAM_TOKEN_IMAGINARY = '123456789:AAE_O0RiWZRJOeOB8Nn8JWia_uUTqa2bXGU'

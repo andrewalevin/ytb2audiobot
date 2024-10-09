@@ -1,5 +1,7 @@
 #!/bin/bash
 
+cd package
+
 source venv/bin/activate
 
 rm -rf dist/*

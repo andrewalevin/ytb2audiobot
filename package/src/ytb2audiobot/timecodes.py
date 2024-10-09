@@ -1,50 +1,7 @@
 import datetime
-import re
 
 from ytb2audiobot.utils import capital2lower
-from ytb2audiobot import config
-
-SYMBOLS_TO_CLEAN = '— – − - = _ |'
-TIMECODES_THRESHOLD_COUNT = 3
-
-
-def clean_timecodes_text(text):
-    text = (text
-            .replace('---', '')
-            .replace('--', '')
-            .replace('===', '')
-            .replace('==', '')
-            .replace(' =', '')
-            .replace('___', '')
-            .replace('__', '')
-            .replace('_ _ _', '')
-            .replace('_ _', '')
-            .replace(' _', '')
-            .replace('\n-', '')
-            .replace('\n=', '')
-            .replace('\n_', '')
-            .replace('\n -', '')
-            .replace('\n =', '')
-            .replace('\n _', '')
-            .strip()
-            .lstrip()
-            .rstrip()
-            )
-    return text
-
-
-def time_to_seconds(time_str):
-    if time_str.count(':') == 1:
-        format_str = '%M:%S'
-        time_obj = datetime.datetime.strptime(time_str, format_str)
-        total_seconds = time_obj.minute * 60 + time_obj.second
-    elif time_str.count(':') == 2:
-        format_str = '%H:%M:%S'
-        time_obj = datetime.datetime.strptime(time_str, format_str)
-        total_seconds = time_obj.hour * 3600 + time_obj.minute * 60 + time_obj.second
-    else:
-        raise ValueError("Time format not recognized")
-    return total_seconds
+from ytbtimecodes.timecodes import get_all_timecodes
 
 
 def filter_timestamp_format(_time):
@@ -81,71 +38,36 @@ def filter_timestamp_format(_time):
     return _time.replace('@@', '').replace('##', '')
 
 
-TIMECODE_PATTERN = r'(\d?:?\d+:\d+)'
-TIMECODE_PATTERN = r'(\d*:*\d+:+\d+)'
-
-
-STRIP_CHARS = ' #$%&@()*+[\\]^_`{|}~--−–—'
-DOTS_CHARS = '.,;:?!'
-
-
-def get_matched(text):
-    print('🍷 Text: ', text)
-    matched = re.findall(TIMECODE_PATTERN, text)
-    print('🍷🍷 Matched: ', matched)
-
-    return matched
-
-
-def get_timestamps_group(text, scheme):
-    print('🍕 get_timestamps_group : ', text)
+async def get_timecodes(scheme, description):
+    print('🛍 get_timecodes: ')
+    print('description: ', description)
     print()
 
-    timestamps_findall_results = []
-    for row in text.split('\n'):
-        if not (matched := re.findall(TIMECODE_PATTERN, row)):
-            continue
+    if not isinstance(description, str):
+        if isinstance(description, list):
+            description = description[0]
+        else:
+            return [], ''
 
-        title = row.replace(matched[0], '')
-        title = title.strip(STRIP_CHARS).lstrip(DOTS_CHARS)
-        timestamps_findall_results.append([matched[0], title])
+    timestamps = get_all_timecodes(description)
+    timecodes = ['' for _ in range(len(scheme))]
+    if not timestamps:
+        return timecodes, ''
 
-    if not timestamps_findall_results:
-        return ['' for _ in range(len(scheme))]
+    print('timestamps: ')
+    print(timestamps)
+    print()
 
-    timestamps_all = [{'time': time_to_seconds(stamp[0]), 'title': stamp[1]} for stamp in timestamps_findall_results]
-
-    timestamps_group = []
+    timecodes = []
     for idx, part in enumerate(scheme):
         output_rows = []
-        for stamp in timestamps_all:
-            if int(stamp.get('time')) < int(part[0]) or int(part[1]) < int(stamp.get('time')):
+        for stamp in timestamps:
+            if int(stamp.get('timecode')) < int(part[0]) or int(part[1]) < int(stamp.get('timecode')):
                 continue
-            time = filter_timestamp_format(datetime.timedelta(seconds=stamp.get('time') - part[0]))
+            time = filter_timestamp_format(datetime.timedelta(seconds=stamp.get('timecode') - part[0]))
             title = capital2lower(stamp.get('title'))
 
             output_rows.append(f'{time} - {title}')
-        timestamps_group.append('\n'.join(output_rows))
+        timecodes.append('\n'.join(output_rows))
 
-    return timestamps_group
-
-
-def get_timecodes_text(description):
-    if not description:
-        return
-    if type(description) is not list:
-        return
-    if len(description) < 1:
-        return ''
-
-    for part in description[0].split('\n\n'):
-        matches = re.findall(TIMECODE_PATTERN, part)
-        if len(matches) > TIMECODES_THRESHOLD_COUNT:
-            return clean_timecodes_text(part)
-
-
-async def get_timecodes(scheme, text):
-    timecodes = ['' for _ in range(len(scheme))]
-    if timecodes_text := get_timecodes_text(text):
-        timecodes = get_timestamps_group(timecodes_text, scheme)
     return timecodes, ''

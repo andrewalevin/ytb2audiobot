@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import pathlib
 import re
@@ -135,6 +136,13 @@ async def write_file(path, data):
     async with aiofiles.open(path.resolve(), 'w') as file:
         await file.write(data)
 
+
+def write_json(path: str, data: dict) -> str:
+    path = pathlib.Path(path)
+    with open(path.as_posix(), 'w+', encoding='utf-8') as file:
+        json.dump(data, file, indent=2, ensure_ascii=False)
+
+    return path.as_posix()
 
 async def get_file_size1(path):
     path = pathlib.Path(path)

@@ -99,6 +99,12 @@ async def processing_commands(command: dict, movie_meta: dict):
 
         return context
 
+    if command.get('name') == 'quote':
+        print('🐠 QUOTE: ')
+        context['quote'] = 'quote'
+        return context
+
+
     tasks = [
         download_audio_by_movie_meta(movie_meta),
         download_thumbnail_by_movie_meta(movie_meta)

@@ -24,6 +24,7 @@ from ytb2audiobot.pytube import get_movie_meta
 from ytb2audiobot.predictor import predict_downloading_time
 from ytb2audiobot.utils import seconds_to_human_readable, read_file, get_hash, write_file
 from ytb2audiobot.cron import update_pip_package_ytdlp
+from ytb2audiobot.logger import logger
 
 storage = MemoryStorage()
 
@@ -31,7 +32,7 @@ dp = Dispatcher(storage=storage)
 
 load_dotenv()
 
-bot = Bot(token='5397737069:AAF8DY61fBQ8dNN2ECJhRWv7EFgzCb01KZQ')
+bot = Bot(token=config.DEFAULT_TELEGRAM_TOKEN_IMAGINARY)
 salt = 'salt0'
 
 data_dir = get_data_dir()
@@ -55,6 +56,14 @@ timerlogger = logging.getLogger(__name__)
 timerlogger.addHandler(timerlogger_handler)
 timerlogger.setLevel(logging.INFO)
 
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('log2.log'),  # Log to file
+        logging.StreamHandler()          # Log to console
+    ]
+)
 
 dev_mode = False
 
@@ -171,6 +180,7 @@ async def processing_download(command_context: dict):
         timerlogger.info(f'duration_' + str(movie_meta.get('duration')) + f' :  predict_{predict_time} : actual_{stopwatch_time} : delta_{int(stopwatch_time - predict_time)}')
 
 
+
 @dp.message(CommandStart())
 @dp.message(Command('help'))
 async def command_start_handler(message: Message) -> None:
@@ -245,7 +255,7 @@ async def message_parser_handler(message: Message):
         return
 
     command_context = get_command_params_of_request(message.text)
-    print('🔫 command_context: ', command_context)
+    logging.debug('🔫 command_context: ', command_context)
 
     if not command_context.get('id'):
         return
@@ -304,6 +314,8 @@ async def start_bot(params=None):
     if dev_mode:
         for file in data_dir.iterdir():
             file.unlink()
+        logger.setLevel(logging.DEBUG)
+        logger.info('🛠🧬 DEV Logging Mode')
 
     global autodownload_chat_ids_hashed
     if config.AUTODOWNLOAD_CHAT_IDS_HASHED_PATH.exists():
@@ -347,6 +359,8 @@ def run_bot(params):
 
 
 def main():
+    logger.debug("This is a debug message")
+
     print('🦎 Preparing CLI ...')
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 
