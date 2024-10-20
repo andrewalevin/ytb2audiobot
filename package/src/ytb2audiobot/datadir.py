@@ -4,7 +4,7 @@ import zlib
 
 from ytb2audiobot import config
 import hashlib
-
+from ytb2audiobot.logger import logger
 
 def get_md5(data, length=999999999):
     md5_hash = hashlib.md5()
@@ -35,7 +35,7 @@ def get_data_dir():
             try:
                 data_dir.unlink()
             except Exception as e:
-                print(f'❌ Error symlink unlink: {e}')
+                logger.error(f'❌ Error symlink unlink: {e}')
 
         data_dir.mkdir(parents=True, exist_ok=True)
 

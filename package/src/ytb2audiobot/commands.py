@@ -46,15 +46,15 @@ def get_command_params_of_request(text):
     text = text.replace('  ', ' ')
     parts = text.split(' ')
 
-    print('🌈 Parts of Request: ', parts)
-    print()
+    #print('🌈 Parts of Request: ', parts)
+    #print()
 
     if not len(parts):
         return command_context
 
     for idx, command in enumerate(config.COMMANDS_FORCE_DOWNLOAD):
         if command.get('alias') == parts[0]:
-            print('🏺 Found bot')
+            #print('🏺 Found bot')
             command_context['force_download'] = True
             parts = parts[1:]
             break
@@ -78,3 +78,22 @@ def get_command_params_of_request(text):
     command_context['params'] = parts[1:config.PARAMS_MAX_COUNT+1]
 
     return command_context
+
+
+def get_big_youtube_move_id(text):
+    text = text.strip()
+    if not is_youtube_url(text):
+        return ''
+
+    urls = URLExtract().find_urls(text)
+    url = ''
+    for url in urls:
+        url = url.strip()
+        if is_youtube_url(url):
+            break
+
+    movie_id = get_youtube_move_id(url)
+    if not movie_id:
+        return ''
+
+    return movie_id

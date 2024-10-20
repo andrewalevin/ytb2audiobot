@@ -39,9 +39,9 @@ def filter_timestamp_format(_time):
 
 
 async def get_timecodes(scheme, description):
-    print('🛍 get_timecodes: ')
-    print('description: ', description)
-    print()
+    #print('🛍 get_timecodes: ')
+    #print('description: ', description)
+    #print()
 
     if not isinstance(description, str):
         if isinstance(description, list):
@@ -49,14 +49,14 @@ async def get_timecodes(scheme, description):
         else:
             return [], ''
 
-    timestamps = get_all_timecodes(description)
-    timecodes = ['' for _ in range(len(scheme))]
-    if not timestamps:
-        return timecodes, ''
+    try:
+        timestamps = get_all_timecodes(description)
+    except Exception as e:
+        return ['' for _ in range(len(scheme))], ''
 
-    print('timestamps: ')
-    print(timestamps)
-    print()
+    #print('timestamps: ')
+    #print(timestamps)
+    #print()
 
     timecodes = []
     for idx, part in enumerate(scheme):

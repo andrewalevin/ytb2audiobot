@@ -18,6 +18,8 @@ async def get_movie_meta(movie_id):
         movie_meta['error'] = f'🟠 Exception. Cant get pytube object. \n🟠 {e}\n\n Continue ... '
         return movie_meta
 
+    print()
+
     if yt.title:
         movie_meta['title'] = yt.title
 

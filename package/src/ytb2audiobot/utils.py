@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import pathlib
+import pprint
 import re
 from pathlib import Path
 
@@ -99,7 +100,7 @@ def filename_m4a(text):
 import datetime
 
 
-def seconds_to_human_readable(seconds):
+def seconds2humanview(seconds):
     # Create a timedelta object representing the duration
     duration = datetime.timedelta(seconds=seconds)
 
@@ -192,3 +193,29 @@ async def run_command(cmd):
 
     return stdout.decode(), stderr.decode(), process.returncode
 
+
+def remove_all_in_dir(data_dir: Path):
+    # Удаление всех файлов и каталогов
+    for item in data_dir.iterdir():
+        if item.is_file():
+            item.unlink()
+        elif item.is_dir():
+            for subitem in item.rglob('*'):
+                if subitem.is_file():
+                    subitem.unlink()
+                elif subitem.is_dir():
+                    subitem.rmdir()
+            item.rmdir()  # Удаление пустого каталога
+
+
+def pprint_format(data):
+    try:
+        text = pprint.pformat(data)
+    except Exception as e:
+        return str(object)
+    else:
+        return text
+
+
+def tabulation2text(text, tab='\t'):
+    return '\n'.join(tab + line for line in text.splitlines())

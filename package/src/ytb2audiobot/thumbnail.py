@@ -2,6 +2,7 @@ import pathlib
 import ssl
 import requests
 from PIL import Image
+from ytb2audiobot.logger import logger
 
 
 async def image_compress_and_resize(

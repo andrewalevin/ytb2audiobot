@@ -1,4 +1,5 @@
 import logging
+import os
 import pathlib
 from string import Template
 
@@ -187,3 +188,9 @@ AUTODOWNLOAD_CHAT_IDS_HASHED_PATH = pathlib.Path('autodownload_chat_ids_hashed.t
 LOG_LEVEL = logging.DEBUG
 
 DEFAULT_TELEGRAM_TOKEN_IMAGINARY = '123456789:AAE_O0RiWZRJOeOB8Nn8JWia_uUTqa2bXGU'
+
+
+# Function to set the environment variable
+# config.py
+
+# Function to set the environment variable

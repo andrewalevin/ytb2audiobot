@@ -3,12 +3,9 @@ import os
 import argparse
 import asyncio
 import logging
-import pathlib
-import sys
+import pprint
 import time
-
 from dotenv import load_dotenv
-
 from aiogram import Bot, Dispatcher, types
 from aiogram.client.default import DefaultBotProperties
 from aiogram.filters import CommandStart, Command, CommandObject
@@ -16,24 +13,21 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile, BufferedInputFile
 
 from ytb2audiobot import config
-from ytb2audiobot.commands import get_command_params_of_request
+from ytb2audiobot.commands import get_command_params_of_request, get_big_youtube_move_id
 from ytb2audiobot.cron import run_periodically, empty_dir_by_cron
 from ytb2audiobot.datadir import get_data_dir
-from ytb2audiobot.processing import processing_commands
-from ytb2audiobot.pytube import get_movie_meta
+from ytb2audiobot.processing import download_processing
+from ytb2audiobot.ytdlp import get_movie_meta
 from ytb2audiobot.predictor import predict_downloading_time
-from ytb2audiobot.utils import seconds_to_human_readable, read_file, get_hash, write_file
+from ytb2audiobot.utils import seconds2humanview, read_file, get_hash, write_file, remove_all_in_dir, \
+    pprint_format, tabulation2text
 from ytb2audiobot.cron import update_pip_package_ytdlp
-from ytb2audiobot.logger import logger
+from ytb2audiobot.logger import logger, BOLD_GREEN, RESET
 
 storage = MemoryStorage()
-
 dp = Dispatcher(storage=storage)
 
-load_dotenv()
-
 bot = Bot(token=config.DEFAULT_TELEGRAM_TOKEN_IMAGINARY)
-salt = 'salt0'
 
 data_dir = get_data_dir()
 
@@ -44,32 +38,22 @@ contextbot = dict()
 autodownload_chat_ids_hashed = dict()
 autodownload_file_hash = ''
 
-timerlogger_handler = logging.FileHandler(config.TIMERS_FILE_PATH.resolve(), mode='a', encoding='utf-8')
-timerlogger_handler.setFormatter(
-    logging.Formatter(
-        fmt="%(asctime)s : %(message)s",
-        datefmt='%Y-%m-%d %H:%M:%S'
+if False:
+    timerlogger_handler = logging.FileHandler(config.TIMERS_FILE_PATH.resolve(), mode='a', encoding='utf-8')
+    timerlogger_handler.setFormatter(
+        logging.Formatter(
+            fmt="%(asctime)s : %(message)s",
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
     )
-)
 
-timerlogger = logging.getLogger(__name__)
-timerlogger.addHandler(timerlogger_handler)
-timerlogger.setLevel(logging.INFO)
-
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('log2.log'),  # Log to file
-        logging.StreamHandler()          # Log to console
-    ]
-)
-
-dev_mode = False
+    timerlogger = logging.getLogger(__name__)
+    timerlogger.addHandler(timerlogger_handler)
+    timerlogger.setLevel(logging.INFO)
 
 
 def get_hash_salted(data):
-    global salt
+    salt = os.environ.get('SALT', '')
     return get_hash(get_hash(data) + salt)
 
 
@@ -90,96 +74,81 @@ async def periodically_autodownload_chat_ids_save(params):
         autodownload_file_hash = data_hash
 
 
-async def processing_download(command_context: dict):
-    global bot
-    sender_id = command_context.get('sender_id')
-    message_id = command_context.get('message_id')
-    post_status = None
-    if command_context.get('post_message_id'):
-        post_status = await bot.edit_message_text(
-            chat_id=sender_id,
-            message_id=command_context.get('post_message_id'),
-            text='⏳ Downloading ... ')
-    else:
-        post_status = await bot.send_message(
-            chat_id=sender_id,
-            reply_to_message_id=message_id,
-            text='⏳ Downloading ... ')
+async def job_downloading(
+        sender_id: int,
+        message_id: id,
+        movie_id: str,
+        info_message_id: int = 0
+):
+    logger.info(f'🐝 Making job_downloading(): sender_id={sender_id}, message_id={message_id}, movie_id={movie_id}')
 
-    movie_meta = await get_movie_meta(command_context.get('id'))
-    print('🚦 Movie meta: ', movie_meta, '\n')
+    # Inverted logic refactor
+    info_message = await bot.send_message(
+        chat_id=sender_id,
+        reply_to_message_id=message_id,
+        text='⏳ Preparing ... '
+    ) if not info_message_id else await bot.edit_message_text(
+        chat_id=sender_id,
+        message_id=info_message_id,
+        text='⏳ Preparing ... '
+    )
+
+    movie_meta = await get_movie_meta(movie_id)
+    logger.debug(f'🚦 Movie meta: \n{tabulation2text(pprint_format(movie_meta))}')
+
+    if not movie_meta.get('title') or not movie_meta.get('duration'):
+        await info_message.edit_text(text='❌💔 Troubles with getting movie meta. Exit. ')
+        return
 
     predict_time = predict_downloading_time(movie_meta.get('duration'))
+    logger.debug(f'⏰ Predict time: {predict_time}')
 
-    if command_context.get('name') != 'subtitles':
-        post_status = await post_status.edit_text(
-            text=f'⏳ Downloading ~ {seconds_to_human_readable(predict_time)} ... ')
+    info_message = await info_message.edit_text(
+        text=f'⏳ Downloading ~ {seconds2humanview(predict_time)} ... ')
 
-    stopwatch_time = time.perf_counter()
-
-    task = asyncio.create_task(processing_commands(command_context, movie_meta))
-    result = await asyncio.wait_for(task, timeout=config.TASK_TIMEOUT_SECONDS)
-    print(f'💚 Processing Result: ', result, '\n')
-
-    await post_status.edit_text('⌛️ Uploading to Telegram ... ')
-
-    if result.get('subtitles'):
-        full_caption = config.SUBTITLES_WITH_CAPTION_TEXT_TEMPLATE.substitute(
-            caption=result.get('subtitles').get('caption'),
-            subtitles=result.get('subtitles').get('text'))
-
-        if len(full_caption) >= config.TELEGRAM_MAX_MESSAGE_TEXT_SIZE:
-            full_caption = full_caption.replace('<b><s><b><s>', '🔹')
-            full_caption = full_caption.replace('</s></b></s></b>', '🔹')
-            await bot.send_document(
-                chat_id=sender_id,
-                reply_to_message_id=message_id,
-                caption=result.get('subtitles').get('caption'),
-                parse_mode='HTML',
-                document=BufferedInputFile(
-                    filename=result.get('subtitles').get('filename'),
-                    file=full_caption.encode('utf-8'),))
-        else:
-            await bot.send_message(
-                chat_id=sender_id,
-                reply_to_message_id=message_id,
-                text=full_caption,
-                parse_mode='HTML',
-                disable_web_page_preview=False)
-
-        await post_status.delete()
+    # todo add depend on predict
+    try:
+        audio_items, err = await asyncio.wait_for(
+            asyncio.create_task(download_processing(movie_meta)),
+            timeout=config.TASK_TIMEOUT_SECONDS
+        )
+    except asyncio.TimeoutError:
+        await info_message.edit_text(text='🚫 Download processing timed out. Please try again later.')
+        return
+    except Exception as e:
+        await info_message.edit_text(text=f'🚫 Error during download_processing(): \n\n{str(e)}')
         return
 
-    if not result.get('audio_datas') or not isinstance(result.get('audio_datas'), list):
-        print('🟠 Warning! No Audio datas or is not NoneType. Exit.')
+    if err:
+        await info_message.edit_text(text=f'🚫 Error during download_processing(): \n\n{str(err)}')
         return
 
-    for idx, audio_data in enumerate(result.get('audio_datas')):
+    if not audio_items:
+        await info_message.edit_text(text='💔 Nothing to send you after downloading. Sorry :(')
+        return
+
+    await info_message.edit_text('⌛🚀️ Uploading to Telegram ... ')
+
+    for idx, item in enumerate(audio_items):
+        logger.info(f'💚 Uploading audio item: ' + str(item.get('audio_path')))
         await bot.send_audio(
             chat_id=sender_id,
             reply_to_message_id=message_id,
-            audio=FSInputFile(path=audio_data.get('audio_path'), filename=audio_data.get('audio_filename')),
-            duration=audio_data.get('duration'),
-            thumbnail=FSInputFile(path=audio_data.get('thumbnail_path')) if audio_data.get('thumbnail_path') else None,
-            caption=audio_data.get('caption'),
+            audio=FSInputFile(path=item.get('audio_path'), filename=item.get('audio_filename')),
+            duration=item.get('duration'),
+            thumbnail=FSInputFile(path=item.get('thumbnail_path')) if item.get('thumbnail_path') else None,
+            caption=item.get('caption'),
             parse_mode='HTML'
         )
+
         # Sleep to avoid flood in Telegram API
-        if idx != len(result.get('audio_datas')) - 1:
-            await asyncio.sleep(math.floor(8 * math.log10(len(result.get('audio_datas')) - 1)))
+        if idx < len(audio_items) - 1:
+            sleep_duration = math.floor(8 * math.log10(len(audio_items) + 1))
+            logger.debug(f'💤😴 Sleep sleep_duration={sleep_duration}')
+            await asyncio.sleep(sleep_duration)
 
-    if result.get('error') or result.get('warning'):
-        await post_status.edit_text('🟥 Error or 🟠 Warning: \n' + result.get('warning') + '\n\n' + result.get('error'))
-    else:
-        await post_status.delete()
-
-    # Save Timer in Dev mode
-    global dev_mode
-    if dev_mode:
-        stopwatch_time = int(time.perf_counter() - stopwatch_time)
-        timerlogger.info(f'duration_' + str(movie_meta.get('duration')) + f' :  predict_{predict_time} : actual_{stopwatch_time} : delta_{int(stopwatch_time - predict_time)}')
-
-
+    await info_message.delete()
+    logger.info(f'💚💚 Done! ')
 
 @dp.message(CommandStart())
 @dp.message(Command('help'))
@@ -198,26 +167,6 @@ async def autodownload_handler(message: Message, command: CommandObject) -> None
         await message.reply(f'Add to Dict: {hash_salted}')
 
 
-@dp.message(Command('timers'))
-async def timers_show_handler(message: Message, command: CommandObject) -> None:
-    global bot
-    print('🍅 timers_show_handler():')
-    print()
-
-    if not config.TIMERS_FILE_PATH.exists():
-        await bot.send_message(chat_id=message.from_user.id, text='No timers file')
-
-    data_text = await read_file(config.TIMERS_FILE_PATH)
-
-    # Inverse and cut and inverse back
-    if len(data_text) > config.MAX_TELEGRAM_BOT_TEXT_SIZE:
-        data_text = '\n'.join(data_text.split('\n')[::-1])
-        data_text = data_text[:config.MAX_TELEGRAM_BOT_TEXT_SIZE-8]
-        data_text = '...\n' + '\n'.join(data_text.split('\n')[::-1])
-
-    await bot.send_message(chat_id=message.from_user.id, text=data_text)
-
-
 @dp.callback_query(lambda c: c.data.startswith('download:'))
 async def process_callback_button(callback_query: types.CallbackQuery):
     global bot
@@ -226,96 +175,93 @@ async def process_callback_button(callback_query: types.CallbackQuery):
     storage_callback_keys[callback_query.data] = ''
 
     parts = callback_query.data.split(':_:')
-    context = {
-        'name': parts[0],
-        'id': parts[1],
-        'message_id': int(parts[2]),
-        'sender_id': int(parts[3]),
-        'post_message_id': callback_query.message.message_id,
-    }
 
-    await processing_download(context)
+    sender_id = int(parts[3])
+    message_id = int(parts[2])
+    movie_id = parts[1]
+    info_message_id = callback_query.message.message_id
+
+    await job_downloading(
+        sender_id=sender_id,
+        message_id=message_id,
+        movie_id=movie_id,
+        info_message_id=info_message_id)
 
 
 @dp.message()
 @dp.channel_post()
-async def message_parser_handler(message: Message):
+async def direct_message_and_post_handler(message: Message):
     global bot
-    sender_id = None
-    sender_type = None
-    if message.from_user:
-        sender_id = message.from_user.id
-        sender_type = 'user'
-    if message.sender_chat:
-        sender_id = message.sender_chat.id
-        sender_type = message.sender_chat.type
-    if not sender_id:
-        return
-    if not message.text:
-        return
+    logger.debug('💈 Handler. Direct Message and Post')
 
-    command_context = get_command_params_of_request(message.text)
-    logging.debug('🔫 command_context: ', command_context)
+    sender_id = (
+        message.from_user.id if message.from_user else
+        message.sender_chat.id if message.sender_chat else
+        None
+    )
 
-    if not command_context.get('id'):
+    # Return if sender_id is not found or if the message has no text
+    if not sender_id or not message.text:
         return
 
-    command_context['message_id'] = message.message_id
-    command_context['sender_id'] = sender_id
+    movie_id = get_big_youtube_move_id(message.text)
+    logging.debug(f'🔫 movie_id={movie_id}')
 
-    if check_chat_id_in_dict(sender_id):
-        await processing_download(command_context)
+    if not movie_id:
+        # todo
         return
 
-    if sender_type != 'user' and not command_context.get('name'):
-        callback_data = ':_:'.join([
-            'download',
-            str(command_context['id']),
-            str(command_context['message_id']),
-            str(command_context['sender_id'])])
-
-        post_status = await bot.send_message(
-            chat_id=sender_id,
-            reply_to_message_id=message.message_id,
-            text=f'Choose one of these options. \nExit in seconds: {config.CALLBACK_WAIT_TIMEOUT}',
-            reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[[InlineKeyboardButton(text='📣 Just Download️', callback_data=callback_data), ], ],))
-
-        # Wait timeout pushing button Just Download
-        await asyncio.sleep(contextbot.get('callback_button_timeout_seconds'))
-
-        # After timeout clear key from storage if button pressed. Otherwies
-        # todo refactor
-        if callback_data in storage_callback_keys:
-            del storage_callback_keys[callback_data]
-        else:
-            await post_status.delete()
-        return
-
-    if not command_context.get('name'):
-        command_context['name'] = 'download'
-
-    await processing_download(command_context)
+    await job_downloading(
+        sender_id=sender_id,
+        message_id=message.message_id,
+        movie_id=movie_id)
 
 
-async def start_bot(params=None):
+    # todo LATER
+    if False:
+        if check_chat_id_in_dict(sender_id):
+            await job_downloading(
+                sender_id=sender_id,
+                message_id=message_id,
+                movie_id=movie_id)
+            return
+
+        # extra For Button in Channels
+        if sender_type != 'user':
+            callback_data = ':_:'.join([
+                'download',
+                str('id'),
+                str('message_id'),
+                str('sender_id')])
+
+            post_status = await bot.send_message(
+                chat_id=sender_id,
+                reply_to_message_id=message.message_id,
+                text=f'Choose one of these options. \nExit in seconds: {config.CALLBACK_WAIT_TIMEOUT}',
+                reply_markup=InlineKeyboardMarkup(
+                    inline_keyboard=[[InlineKeyboardButton(text='📣 Just Download️', callback_data=callback_data), ], ],))
+
+            # Wait timeout pushing button Just Download
+            await asyncio.sleep(contextbot.get('callback_button_timeout_seconds'))
+
+            # After timeout clear key from storage if button pressed. Otherwies
+            # todo refactor
+            if callback_data in storage_callback_keys:
+                del storage_callback_keys[callback_data]
+            else:
+                await post_status.delete()
+            return
+
+
+async def run_bot_asynchronously():
     global bot
 
-    if params is None:
-        params = {}
+    me = await bot.get_me()
+    logger.info(f'🚀 Telegram bot: f{me.full_name} https://t.me/{me.username}')
 
-    if 'keep_data_files' in params:
-        global keep_data_files
-        keep_data_files = params['keep_data_files']
-
-    global dev_mode
-    if 'dev_mode' in params:
-        dev_mode = params['dev_mode']
-    if dev_mode:
-        for file in data_dir.iterdir():
-            file.unlink()
-        logger.setLevel(logging.DEBUG)
-        logger.info('🛠🧬 DEV Logging Mode')
+    if os.environ.get('KEEP_DATA_FILES', 'false') != 'true':
+        logger.info('♻️🗑 Remove last files in DATA')
+        remove_all_in_dir(data_dir)
 
     global autodownload_chat_ids_hashed
     if config.AUTODOWNLOAD_CHAT_IDS_HASHED_PATH.exists():
@@ -326,7 +272,7 @@ async def start_bot(params=None):
         autodownload_file_hash = get_hash(data)
 
         autodownload_chat_ids_hashed = {row: None for row in data.split('\n')}
-    print('🧮 Hashed Dict Init:  ', autodownload_chat_ids_hashed)
+    logger.debug(f'🧮 Hashed Dict Init:  {autodownload_chat_ids_hashed}', )
 
     await asyncio.gather(
         run_periodically(30, empty_dir_by_cron, {'age': 3600}),
@@ -341,64 +287,45 @@ async def start_bot(params=None):
     )
 
 
-def run_bot(params):
-    print('🚀 Running bot ... with params: ', params.keys())
-    print('🏠 Current instance data_dir: ', data_dir.resolve())
-
-    global bot
-    bot = Bot(token=params['token'], default=DefaultBotProperties(parse_mode='HTML'))
-
-    global salt
-    salt = params['salt']
-
-    if params.get('dev_mode'):
-        print(params)
-        print()
-
-    asyncio.run(start_bot(params))
-
-
 def main():
-    logger.debug("This is a debug message")
+    logging.info("\n")
+    logger.info(f'{BOLD_GREEN}🚀 Launching bot app ... {RESET}')
 
-    print('🦎 Preparing CLI ...')
-    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+    load_dotenv()
 
     parser = argparse.ArgumentParser(
         description='🥭 Bot. Youtube to audio telegram bot with subtitles',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument('--keepfiles', type=int, default=0,
-                        help='Keep raw files 1=True, 0=False (default)')
-    parser.add_argument('--split-delta', type=int, default=5,
-                        help=f'Delta seconds in splitting audio in range '
-                             f'[{config.AUDIO_SPLIT_DELTA_SECONDS_MIN}, {config.AUDIO_SPLIT_DELTA_SECONDS_MAX}]')
-    parser.add_argument('--keep-files-time', type=int, default=60,
-                        help=f'Keep tmp files tim in minutes in range [{config.KEEP_FILE_TIME_MINUTES_MIN}, ... ]. '
-                             f'Set very big number to disable.')
-    parser.add_argument('--telegram-callback-button-timeout', type=int, default=8,
-                        help=f'Timeout for telegram callback button in channel. '
-                             f'Range [{config.TELEGRAM_CALLBACK_BUTTON_TIMEOUT_SECONDS_MIN}, '
-                             f'{config.TELEGRAM_CALLBACK_BUTTON_TIMEOUT_SECONDS_MAX}] ')
-    parser.add_argument('--dev', default=False, action=argparse.BooleanOptionalAction)
+    parser.add_argument('--debug', action='store_true', help='Debug mode.')
+    parser.add_argument('--keep-data-files', action='store_true', help='Keep Data Files')
 
     args = parser.parse_args()
-    params = dict()
-    if args.keepfiles == 1:
-        params['keep_data_files'] = True
-        print('🔓🗂 Keeping Data files: ', keep_data_files)
 
-    if args.dev:
-        params['dev_mode'] = True
+    os.environ['DEBUG'] = 'true' if args.debug else 'false'
 
-    params['token'] = os.environ.get("TG_TOKEN")
-    params['salt'] = os.environ.get("SALT")
+    if os.getenv('DEBUG', 'false') == 'true':
+        logger.setLevel(logging.DEBUG)
+        logger.debug('🎃 DEBUG mode is set. All debug messages will be in stdout.')
 
-    if not params['salt']:
-        print('🔴 No Salt set  in .env. Make add any random hash with key SALT!')
+        os.environ['KEEP_DATA_FILES'] = 'true'
+
+    if not os.getenv("TG_TOKEN", ''):
+        logger.error('🔴 No TG_TOKEN variable set in env. Make add and restart bot.')
         return
 
-    run_bot(params)
+    if not os.getenv("HASH_SALT", ''):
+        logger.error('🔴 No HASH_SALT variable set in env9-last. Make add any random hash with key SALT!')
+        return
+
+    logger.info('🗂 data_dir: ' + f'{data_dir.resolve().as_posix()}')
+
+    global bot
+    bot = Bot(
+        token=os.environ.get('TG_TOKEN', config.DEFAULT_TELEGRAM_TOKEN_IMAGINARY),
+        default=DefaultBotProperties(parse_mode='HTML'))
+
+    asyncio.run(run_bot_asynchronously())
 
 
 if __name__ == "__main__":
