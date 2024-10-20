@@ -118,7 +118,7 @@ if [[ -z "$TG_TOKEN" || -z "$SALT" ]]; then
   exit 1
 fi
 
-# Write to env9-last file
+# Write to .env file
 echo -e "TG_TOKEN='$TG_TOKEN'\nSALT='$SALT'" > .env9
 
 # Confirm that the file has been written

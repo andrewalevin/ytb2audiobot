@@ -7,9 +7,9 @@ set -e
 # shellcheck disable=SC2162
 read -p "📟 Please enter your telegram bot token: " TG_TOKEN < /dev/tty
 if [ -z "$TG_TOKEN" ]; then
-    echo "🚫 No input token!"
-    echo "🪂 Exit."
-    exit 1
+  echo "🚫 No input token!"
+  echo "🪂 Exit."
+  exit 1
 fi
 
 # shellcheck disable=SC2162
@@ -17,8 +17,8 @@ read -p "🧂 Please enter salt hash if exists. If not - press Enter - it will b
 
 # Check if the user provided a salt
 if [ -z "$HASH_SALT" ]; then
-    HASH_SALT=$(openssl rand -hex 32)
-    echo "💚 Generated random salt: $HASH_SALT"
+  HASH_SALT=$(openssl rand -hex 32)
+  echo "💚 Generated random salt: $HASH_SALT"
 fi
 
 if [[ -z "$TG_TOKEN" || -z "$HASH_SALT" ]]; then
@@ -42,7 +42,6 @@ if ! command -v docker &> /dev/null; then
   exit 1
   echo "🪂 Exit."
 fi
-
 
 if ! docker info > /dev/null 2>&1; then
   echo "🚫 Docker daemon is not running."

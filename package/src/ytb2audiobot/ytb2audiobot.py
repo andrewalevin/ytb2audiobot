@@ -315,7 +315,7 @@ def main():
         return
 
     if not os.getenv("HASH_SALT", ''):
-        logger.error('🔴 No HASH_SALT variable set in env9-last. Make add any random hash with key SALT!')
+        logger.error('🔴 No HASH_SALT variable set in .env. Make add any random hash with key SALT!')
         return
 
     logger.info('🗂 data_dir: ' + f'{data_dir.resolve().as_posix()}')
