@@ -6,10 +6,8 @@ RUN apt-get update
 
 RUN apt-get install ffmpeg -y
 
-RUN pip install ytb2audiobot>=2.615
-
-RUN pip list
-
 ENV PYTHONUNBUFFERED=1
+
+RUN pip install --no-cache-dir --upgrade ytb2audiobot
 
 CMD ["ytb2audiobot"]
