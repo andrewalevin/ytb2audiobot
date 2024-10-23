@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 import os
 import pathlib
@@ -8,7 +9,6 @@ from pathlib import Path
 
 import aiofiles
 import aiofiles.os
-import xxhash
 
 CAPITAL_LETTERS_PERCENT_THRESHOLD = 0.3
 
@@ -175,7 +175,7 @@ def get_hash(data):
     if not isinstance(data, str):
         data = str(data)
 
-    return xxhash.xxh64(data.encode('utf-8')).hexdigest()
+    return hashlib.sha256(data.encode('utf-8')).hexdigest()
 
 
 async def check_autodownload_hashs(ids_dict):

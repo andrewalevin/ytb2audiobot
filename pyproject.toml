@@ -52,7 +52,6 @@ dependencies = [
   'pyyaml',
   'aiofiles',
   'urlextract',
-  'xxhash',
   'ytbtimecodes',
   'yt-dlp',
 ]
