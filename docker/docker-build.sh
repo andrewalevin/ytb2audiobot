@@ -4,7 +4,7 @@
 IMAGE_NAME="ytb2audiobot"  # Название вашего образа
 REGISTRY="andrewlevin"  # Ваш Docker реестр, например, Docker Hub или локальный реестр
 
-TAG='2.606'
+TAG='2.615'
 
 # Построить образ с новым тэгом
 docker build -t $REGISTRY/$IMAGE_NAME:$TAG .

@@ -3,10 +3,12 @@ import os
 import argparse
 import asyncio
 import logging
-import pprint
-import time
+
+import yt_dlp
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.context import FSMContext
 from dotenv import load_dotenv
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher, types, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.filters import CommandStart, Command, CommandObject
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -17,12 +19,13 @@ from ytb2audiobot.commands import get_command_params_of_request, get_big_youtube
 from ytb2audiobot.cron import run_periodically, empty_dir_by_cron
 from ytb2audiobot.datadir import get_data_dir
 from ytb2audiobot.processing import download_processing
-from ytb2audiobot.ytdlp import get_movie_meta
 from ytb2audiobot.predictor import predict_downloading_time
 from ytb2audiobot.utils import seconds2humanview, read_file, get_hash, write_file, remove_all_in_dir, \
     pprint_format, tabulation2text
 from ytb2audiobot.cron import update_pip_package_ytdlp
 from ytb2audiobot.logger import logger, BOLD_GREEN, RESET
+from importlib.metadata import version
+
 
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
@@ -93,18 +96,59 @@ async def job_downloading(
         text='⏳ Preparing ... '
     )
 
-    movie_meta = await get_movie_meta(movie_id)
-    logger.debug(f'🚦 Movie meta: \n{tabulation2text(pprint_format(movie_meta))}')
+    # movie_meta = await get_movie_meta(movie_id)
 
-    if not movie_meta.get('title') or not movie_meta.get('duration'):
-        await info_message.edit_text(text='❌💔 Troubles with getting movie meta. Exit. ')
+    ydl_opts = {
+        'logtostderr': False,  # Avoids logging to stderr, logs to the logger instead
+        'quiet': True,  # Suppresses default output,
+        'nocheckcertificate': True,
+        'no_warnings': True,
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            yt_info = ydl.extract_info(f"https://www.youtube.com/watch?v={movie_id}", download=False)
+    except Exception as e:
+        logger.error(f'🍅 Cant Extract YT_DLP info. \n{e}')
+        return {}
+
+    if yt_info.get('is_live'):
+        await info_message.edit_text(
+            text='❌🎬💃 This movie video is now live and unavailable for download. Please try again later')
         return
 
-    predict_time = predict_downloading_time(movie_meta.get('duration'))
+    if not any(format_item.get('filesize') is not None for format_item in yt_info.get('formats', [])):
+        await info_message.edit_text(text='❌🎬🤔 Audiо file for this video is unavailable for an unknown reason.')
+        return
+
+    if not yt_info.get('title') or not yt_info.get('duration'):
+        await info_message.edit_text(text='❌🎬💔 No title or duration info of this video.')
+        return
+
+    predict_time = predict_downloading_time(yt_info.get('duration'))
     logger.debug(f'⏰ Predict time: {predict_time}')
 
-    info_message = await info_message.edit_text(
-        text=f'⏳ Downloading ~ {seconds2humanview(predict_time)} ... ')
+    info_message = await info_message.edit_text(text=f'⏳ Downloading ~ {seconds2humanview(predict_time)} ... ')
+
+    # todo refactor Movie meta
+
+    movie_meta = config.DEFAULT_MOVIE_META.copy()
+    movie_meta['id'] = movie_id
+    movie_meta['store'] = get_data_dir()
+
+    mapping = {
+        'title': 'title',
+        'description': 'description',
+        'uploader': 'author',
+        'thumbnail': 'thumbnail_url',
+        'duration': 'duration'
+    }
+
+    for yt_key, meta_key in mapping.items():
+        if yt_info.get(yt_key):
+            movie_meta[meta_key] = yt_info.get(yt_key)
+
+    logger.debug(f'🚦 Movie meta: \n{tabulation2text(pprint_format(movie_meta))}')
 
     # todo add depend on predict
     try:
@@ -150,6 +194,7 @@ async def job_downloading(
     await info_message.delete()
     logger.info(f'💚💚 Done! ')
 
+
 @dp.message(CommandStart())
 @dp.message(Command('help'))
 async def command_start_handler(message: Message) -> None:
@@ -167,9 +212,83 @@ async def autodownload_handler(message: Message, command: CommandObject) -> None
         await message.reply(f'Add to Dict: {hash_salted}')
 
 
+@dp.callback_query(lambda c: c.data == 'split')
+async def process_callback_split(callback_query: types.CallbackQuery):
+    await bot.edit_message_text(
+        chat_id=callback_query.from_user.id,
+        message_id=callback_query.message.message_id,
+        text='Split!'
+    )
+
+
+@dp.callback_query(lambda c: c.data == 'bitrate')
+async def process_callback_split(callback_query: types.CallbackQuery):
+    await bot.edit_message_text(
+        chat_id=callback_query.from_user.id,
+        message_id=callback_query.message.message_id,
+        text='Bitrate!'
+    )
+
+
+form_router = Router()
+dp.include_router(form_router)
+
+
+# Определяем состояния для FSM (Finite State Machine)
+class Form(StatesGroup):
+    movie_url_and_search = State()
+
+
+@dp.callback_query(lambda c: c.data == 'subtitles')
+async def process_callback_split(callback_query: types.CallbackQuery, state: FSMContext):
+    await bot.edit_message_text(
+        chat_id=callback_query.from_user.id,
+        message_id=callback_query.message.message_id,
+        text='📝 Subtitles! Send me yotuube link and add search words after'
+    )
+
+    await state.set_state(Form.movie_url_and_search)
+
+
+@form_router.message(Form.movie_url_and_search)
+async def process_movie_url(message: Message, state: FSMContext) -> None:
+    await state.update_data(movie_url_and_search=message.text)
+    await message.answer('Got. Now Preocessing')
+
+
+@dp.message(Command('version'))
+async def autodownload_handler(message: Message, command: CommandObject) -> None:
+    package_name = 'ytb2audiobot'
+    package_version = -1
+
+    try:
+        package_version = version(package_name)
+    except Exception as e:
+        logger.error(f'Cant get a version: {e}')
+
+    await message.reply(f"{package_name} version: {package_version}")
+
+
+@dp.message(Command('extra'))
+async def autodownload_handler(message: Message, command: CommandObject) -> None:
+    logger.debug('🍟 Extra Options')
+
+    menu_message = await bot.send_message(
+        chat_id=message.from_user.id,
+        reply_to_message_id=None,
+        text=f'Choose one of these extra options.',
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(text='📣 Split', callback_data=f'split'),
+                    InlineKeyboardButton(text='📣 Bitrate', callback_data=f'bitrate'), ],
+                [
+                    InlineKeyboardButton(text='📣 Subtitles', callback_data=f'subtitles'), ],
+            ], ))
+
+
 @dp.callback_query(lambda c: c.data.startswith('download:'))
 async def process_callback_button(callback_query: types.CallbackQuery):
-    global bot
     await bot.answer_callback_query(callback_query.id)
 
     storage_callback_keys[callback_query.data] = ''
@@ -216,7 +335,6 @@ async def direct_message_and_post_handler(message: Message):
         message_id=message.message_id,
         movie_id=movie_id)
 
-
     # todo LATER
     if False:
         if check_chat_id_in_dict(sender_id):
@@ -239,7 +357,8 @@ async def direct_message_and_post_handler(message: Message):
                 reply_to_message_id=message.message_id,
                 text=f'Choose one of these options. \nExit in seconds: {config.CALLBACK_WAIT_TIMEOUT}',
                 reply_markup=InlineKeyboardMarkup(
-                    inline_keyboard=[[InlineKeyboardButton(text='📣 Just Download️', callback_data=callback_data), ], ],))
+                    inline_keyboard=[
+                        [InlineKeyboardButton(text='📣 Just Download️', callback_data=callback_data), ], ], ))
 
             # Wait timeout pushing button Just Download
             await asyncio.sleep(contextbot.get('callback_button_timeout_seconds'))

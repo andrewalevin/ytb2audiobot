@@ -11,7 +11,7 @@ data_dir = get_data_dir()
 
 
 async def update_pip_package_ytdlp(params):
-    stdout, stderr, return_code = await run_command('pip install --upgrade yt-dlp')
+    stdout, stderr, return_code = await run_command('pip install --upgrade yt-dlp --root-user-action=ignore')
 
     sign = 'Success! ✅' if return_code == 0 else 'Failure! ❌'
     logger.info(f'🎃🔄 Upgrade yt-dlp package: {sign}')

@@ -4,6 +4,24 @@ from ytb2audiobot.datadir import get_data_dir
 from ytb2audiobot.logger import logger
 
 
+async def get_yt_dlp_info(movie_id):
+    ydl_opts = {
+        'logtostderr': False,  # Avoids logging to stderr, logs to the logger instead
+        'quiet': True,  # Suppresses default output,
+        'nocheckcertificate': True,
+        'no_warnings': True,
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            _info = ydl.extract_info(f"https://www.youtube.com/watch?v={movie_id}", download=False)
+    except Exception as e:
+        logger.error(f'🍅 Cant Extract YT_DLP info. \n{e}')
+        return {}
+
+    return _info
+
+
 async def get_movie_meta(movie_id):
     logger.debug(f'🐞 get_movie_meta(movie_id): {movie_id}')
 
