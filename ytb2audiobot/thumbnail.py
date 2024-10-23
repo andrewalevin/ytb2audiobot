@@ -1,7 +1,6 @@
 import pathlib
 import ssl
 import requests
-from PIL import Image
 from ytb2audiobot.logger import logger
 
 
@@ -11,20 +10,7 @@ async def image_compress_and_resize(
         quality: int = 80,
         thumbnail_size=(960, 960)
 ):
-    if not path:
-        return
-
-    path = pathlib.Path(path)
-    if not path.exists():
-        return
-
-    image = Image.open(path)
-    image.thumbnail(thumbnail_size)
-    if not output:
-        output = path
-    image.save(output, optimize=True, quality=quality)
-
-    return output
+    return path
 
 
 async def download(url: str, output):

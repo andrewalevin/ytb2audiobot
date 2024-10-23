@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"  # If not defined, then legacy behavior 
 
 [project]
 name = "ytb2audiobot"
-version = "PROJECT_VERSION"
+version = "3434"
 
 description = "🦜 Youtube to Audio by Andrew A Levin"
 readme = "README.md"
@@ -48,7 +48,6 @@ dependencies = [
   'python-dotenv',
   'pytube',
   'mutagen',
-  'pillow',
   'youtube-transcript-api',
   'pyyaml',
   'aiofiles',
