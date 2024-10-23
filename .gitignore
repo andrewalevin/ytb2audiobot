@@ -2,7 +2,7 @@
 
 data
 
-.env
+*.env
 
 package/data
 
