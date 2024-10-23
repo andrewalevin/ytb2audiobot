@@ -3,7 +3,7 @@ import math
 from datetime import timedelta
 from string import Template
 
-from audio2splitted.audio2splitted import DURATION_MINUTES_MIN, DURATION_MINUTES_MAX, get_split_audio_scheme, \
+from audio2splitted.audio2splitted import get_split_audio_scheme, \
     make_split_audio
 
 from ytb2audiobot import config
@@ -12,8 +12,7 @@ from ytb2audiobot.thumbnail import image_compress_and_resize
 from ytb2audiobot.timecodes import get_timecodes, filter_timestamp_format
 from ytb2audiobot.thumbnail import download_thumbnail_by_movie_meta
 from ytb2audiobot.audio import download_audio_by_movie_meta
-from ytb2audiobot.utils import capital2lower, filename_m4a, remove_m4a_file_if_exists, get_file_size, tabulation2text, \
-    pprint_format
+from ytb2audiobot.utils import capital2lower, filename_m4a, get_file_size
 from ytb2audiobot.logger import logger
 
 

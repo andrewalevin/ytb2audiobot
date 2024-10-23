@@ -12,15 +12,15 @@ from aiogram import Bot, Dispatcher, types, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.filters import CommandStart, Command, CommandObject
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile, BufferedInputFile
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
 
 from ytb2audiobot import config
-from ytb2audiobot.commands import get_command_params_of_request, get_big_youtube_move_id
+from ytb2audiobot.commands import get_big_youtube_move_id
 from ytb2audiobot.cron import run_periodically, empty_dir_by_cron
 from ytb2audiobot.datadir import get_data_dir
 from ytb2audiobot.processing import download_processing
 from ytb2audiobot.predictor import predict_downloading_time
-from ytb2audiobot.utils import seconds2humanview, read_file, get_hash, write_file, remove_all_in_dir, \
+from ytb2audiobot.utils import seconds2humanview, get_hash, write_file, remove_all_in_dir, \
     pprint_format, tabulation2text
 from ytb2audiobot.cron import update_pip_package_ytdlp
 from ytb2audiobot.logger import logger, BOLD_GREEN, RESET

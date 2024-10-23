@@ -75,7 +75,7 @@ def get_command_params_of_request(text):
     if len(parts) < 2:
         return command_context
 
-    command_context['params'] = parts[1:config.PARAMS_MAX_COUNT+1]
+    command_context['params'] = parts[1:config.PARAMS_MAX_COUNT + 1]
 
     return command_context
 

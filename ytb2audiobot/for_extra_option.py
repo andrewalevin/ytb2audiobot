@@ -66,7 +66,7 @@ async def timers_show_handler(message: Message, command: CommandObject) -> None:
     # Inverse and cut and inverse back
     if len(data_text) > config.MAX_TELEGRAM_BOT_TEXT_SIZE:
         data_text = '\n'.join(data_text.split('\n')[::-1])
-        data_text = data_text[:config.MAX_TELEGRAM_BOT_TEXT_SIZE-8]
+        data_text = data_text[:config.MAX_TELEGRAM_BOT_TEXT_SIZE - 8]
         data_text = '...\n' + '\n'.join(data_text.split('\n')[::-1])
 
     await bot.send_message(chat_id=message.from_user.id, text=data_text)
