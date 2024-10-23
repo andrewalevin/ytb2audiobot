@@ -3,7 +3,6 @@
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"  # If not defined, then legacy behavior can happen.
 
-
 [project]
 name = "ytb2audiobot"
 version = "PROJECT_VERSION"
