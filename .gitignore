@@ -1,5 +1,7 @@
 # Byte-compiled / optimized / DLL files
 
+data
+
 package/data
 
 __pycache__/
