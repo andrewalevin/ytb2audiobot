@@ -1,7 +1,5 @@
 #!/bin/bash
 
-cd package
-
 source venv/bin/activate
 
 rm -rf dist/*
@@ -12,9 +10,6 @@ python3 -m pip install --upgrade twine
 
 python3 -m build
 
-last_created_file=$(ls -t dist/*.whl | head -n 1)
-echo "$last_created_file"
-
-pip install "$last_created_file"
+python3 -m twine upload dist/*
 
 
