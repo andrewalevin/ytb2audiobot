@@ -413,7 +413,7 @@ async def run_bot_asynchronously():
 
 def main():
     logging.info("\n")
-    logger.info(f'{BOLD_GREEN}🚀 Launching bot app ... {RESET}')
+    logger.info(f'{BOLD_GREEN}🚀🚀  Launching bot app. Package version: {version(config.PACKAGE_NAME)} {RESET}')
 
     load_dotenv()
 
