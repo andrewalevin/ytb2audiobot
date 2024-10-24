@@ -258,15 +258,7 @@ async def process_movie_url(message: Message, state: FSMContext) -> None:
 
 @dp.message(Command('version'))
 async def autodownload_handler(message: Message, command: CommandObject) -> None:
-    package_name = 'ytb2audiobot'
-    package_version = -1
-
-    try:
-        package_version = version(package_name)
-    except Exception as e:
-        logger.error(f'Cant get a version: {e}')
-
-    await message.reply(f"{package_name} version: {package_version}")
+    await message.reply(f"🟢 {config.PACKAGE_NAME} version: {version(config.PACKAGE_NAME)}")
 
 
 @dp.message(Command('extra'))

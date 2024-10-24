@@ -4,6 +4,8 @@ data
 
 *.env
 
+autodownload_chat_ids_hashed.txt
+
 package/data
 
 __pycache__/
