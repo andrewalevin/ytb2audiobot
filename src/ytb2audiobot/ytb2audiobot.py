@@ -381,7 +381,7 @@ async def run_bot_asynchronously():
     if True or os.getenv('DEBUG', 'false') == 'true':
         await bot.send_message(
             chat_id=config.OWNER_SENDER_ID,
-            text=f'🚀 Bot started. Version: {version(config.PACKAGE_NAME)}')
+            text=f'🚀👋 Bot started. Version: {version(config.PACKAGE_NAME)}')
 
     if os.environ.get('KEEP_DATA_FILES', 'false') != 'true':
         logger.info('♻️🗑 Remove last files in DATA')
