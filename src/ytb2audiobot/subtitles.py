@@ -1,6 +1,6 @@
 import time
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled
-from ytb2audiobot import config
+from src.ytb2audiobot import config
 
 
 def get_answer_text(subtitles, selected_index=None):

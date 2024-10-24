@@ -194,3 +194,7 @@ DEFAULT_TELEGRAM_TOKEN_IMAGINARY = '123456789:AAE_O0RiWZRJOeOB8Nn8JWia_uUTqa2bXG
 # config.py
 
 # Function to set the environment variable
+
+OWNER_SENDER_ID = '4583603'
+
+PACKAGE_NAME = 'ytb2audiobot'

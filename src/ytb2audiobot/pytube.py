@@ -1,6 +1,6 @@
 from pytube import YouTube
-from ytb2audiobot import config
-from ytb2audiobot.datadir import get_data_dir
+from src.ytb2audiobot import config
+from src.ytb2audiobot.datadir import get_data_dir
 
 
 async def get_movie_meta(movie_id):

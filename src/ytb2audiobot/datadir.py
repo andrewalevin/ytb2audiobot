@@ -6,6 +6,7 @@ from ytb2audiobot import config
 import hashlib
 from ytb2audiobot.logger import logger
 
+
 def get_md5(data, length=999999999):
     md5_hash = hashlib.md5()
     md5_hash.update(data.encode('utf-8'))

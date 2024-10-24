@@ -1,7 +1,7 @@
 import yt_dlp
-from ytb2audiobot import config
-from ytb2audiobot.datadir import get_data_dir
-from ytb2audiobot.logger import logger
+from src.ytb2audiobot import config
+from src.ytb2audiobot.datadir import get_data_dir
+from src.ytb2audiobot.logger import logger
 
 
 async def get_yt_dlp_info(movie_id):

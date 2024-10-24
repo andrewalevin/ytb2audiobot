@@ -2,9 +2,9 @@ from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
 from audio2splitted.audio2splitted import DURATION_MINUTES_MIN, DURATION_MINUTES_MAX
 
-from ytb2audiobot import config, logger
-from ytb2audiobot.utils import remove_m4a_file_if_exists, read_file
-from ytb2audiobot.ytb2audiobot import dp
+from src.ytb2audiobot import config, logger
+from src.ytb2audiobot.utils import remove_m4a_file_if_exists, read_file
+from src.ytb2audiobot.ytb2audiobot import dp
 
 command = dict()
 context = dict()

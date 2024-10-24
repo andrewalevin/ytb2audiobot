@@ -7,7 +7,7 @@ from speechkit.stt import AudioProcessingType
 import pathlib
 from dotenv import load_dotenv
 
-from ytb2audiobot.gpt import promt_gpt
+from src.ytb2audiobot.gpt import promt_gpt
 
 
 async def get_subtitles(movie_id):

@@ -1,4 +1,4 @@
-from ytb2audiobot import config
+from src.ytb2audiobot import config
 
 
 def read_autodownload_chat_ids_hashed():

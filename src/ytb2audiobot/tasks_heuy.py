@@ -1,5 +1,5 @@
 from huey import SqliteHuey
-from ytb2audiobot.processing import download_processing
+from src.ytb2audiobot.processing import download_processing
 
 huey = SqliteHuey(filename='../dev/huey-table.db')
 

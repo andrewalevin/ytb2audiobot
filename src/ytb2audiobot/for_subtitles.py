@@ -3,8 +3,8 @@ from string import Template
 from aiogram import Bot
 from aiogram.types import BufferedInputFile
 
-from ytb2audiobot import config
-from ytb2audiobot.subtitles import get_subtitles
+from src.ytb2audiobot import config
+from src.ytb2audiobot.subtitles import get_subtitles
 
 bot = Bot()
 

@@ -378,6 +378,11 @@ async def run_bot_asynchronously():
     me = await bot.get_me()
     logger.info(f'🚀 Telegram bot: f{me.full_name} https://t.me/{me.username}')
 
+    if os.getenv('DEBUG', 'false') == 'true':
+        await bot.send_message(
+            chat_id=config.OWNER_SENDER_ID,
+            text=f'🚀 Bot started. Version: {version(config.PACKAGE_NAME)}')
+
     if os.environ.get('KEEP_DATA_FILES', 'false') != 'true':
         logger.info('♻️🗑 Remove last files in DATA')
         remove_all_in_dir(data_dir)
