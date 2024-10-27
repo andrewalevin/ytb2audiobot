@@ -118,7 +118,7 @@ async def job_downloading(
 
     # todo add depend on predict
     try:
-        audio_items = await asyncio.wait_for(asyncio.create_task(download_processing(movie_meta)), timeout=predict_time)
+        audio_items = await asyncio.wait_for(asyncio.create_task(download_processing(movie_meta)), timeout=config.TASK_TIMEOUT_SECONDS)
     except asyncio.TimeoutError:
         await info_message.edit_text(text='🚫 Download processing timed out. Please try again later.')
         return
