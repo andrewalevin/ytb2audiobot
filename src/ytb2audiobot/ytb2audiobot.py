@@ -14,9 +14,9 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from ytb2audiobot import config
 from ytb2audiobot.cron import run_periodically, empty_dir_by_cron
 from ytb2audiobot.datadir import get_data_dir
-from ytb2audiobot.hardworkbot import direct_message_and_post_work, autodownload_work, job_downloading
-from ytb2audiobot.logger import BOLD_GREEN, RESET, logger
-from ytb2audiobot.utils import remove_all_in_dir
+from ytb2audiobot.hardworkbot import direct_message_and_post_work, autodownload_work, job_downloading, make_subtitles
+from ytb2audiobot.logger import logger
+from ytb2audiobot.utils import remove_all_in_dir, green_text, bold_text
 from ytb2audiobot.cron import update_pip_package_ytdlp
 from importlib.metadata import version
 
@@ -50,9 +50,22 @@ class StateFormMenuExtra(StatesGroup):
     subtitles_search = State()
 
 
-@dp.message(Command(commands='extra'), StateFilter(default_state))
+ADVANCED_OPTIONS_TEXT = '''
+🎬 Advanced options can help you to:
+    
+    •	✂️ Split audio into parts of a desired length
+    •	🎷 Bitrate adjustment for audio
+    •	📝 Subtitles download and word search
+    
+🔗 Send me your link to YouTube\'s video ... 
+'''
+
+
+@dp.message(
+    Command(commands=['extra', 'options', 'advanced']),
+    StateFilter(default_state))
 async def case_url_set(message: Message, state: FSMContext) -> None:
-    await message.answer("🎬🔗 Paste youtube URL to make extra options: ")
+    await message.answer(text=ADVANCED_OPTIONS_TEXT)
     await state.set_state(StateFormMenuExtra.url)
 
 
@@ -66,16 +79,16 @@ async def case_show_options(message: types.Message, state: FSMContext):
     await bot.send_message(
         chat_id=message.from_user.id,
         reply_to_message_id=None,
-        text=f'🤔 What to do? .',
+        text=f'🤔 Select advanced option? .',
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text='✂️ Split duration', callback_data='split'),
-             InlineKeyboardButton(text='🎸 Set audio Bitrate', callback_data='bitrate')],
+             InlineKeyboardButton(text='🎷 Set audio Bitrate', callback_data='bitrate')],
             [InlineKeyboardButton(text='📝 Get subtitles', callback_data='subtitles')]]))
 
 
 prime_numbers_row1 = [2, 3, 5, 7, 11, 13, 17, 19]
 prime_numbers_row2 = [23, 29, 31, 37, 41, 43]
-prime_numbers_row3 = [47, 53, 59, 61, 67,]
+prime_numbers_row3 = [47, 53, 59, 61, 67, ]
 prime_numbers_row4 = [73, 79, 83, 89]
 
 keyboard_split_duration = InlineKeyboardMarkup(inline_keyboard=[
@@ -88,7 +101,7 @@ keyboard_bitrate_values = InlineKeyboardMarkup(inline_keyboard=[[
     InlineKeyboardButton(text='48k', callback_data='48'),
     InlineKeyboardButton(text='64k', callback_data='64'),
     InlineKeyboardButton(text='96k', callback_data='96'),
-    InlineKeyboardButton(text='128k', callback_data='128')],[
+    InlineKeyboardButton(text='128k', callback_data='128')], [
     InlineKeyboardButton(text='196k', callback_data='196'),
     InlineKeyboardButton(text='256k', callback_data='256'),
     InlineKeyboardButton(text='320k', callback_data='320')]])
@@ -133,7 +146,7 @@ async def case_split_processing(callback_query: types.CallbackQuery, state: FSMC
     data = await state.get_data()
     url = data.get('url')
 
-    #todo
+    # todo
 
     await state.clear()
     await bot.edit_message_text(
@@ -163,22 +176,17 @@ async def case_subtitle_options_processing(callback_query: types.CallbackQuery, 
     data = await state.get_data()
     url = data.get('url')
 
-    if action == 'search':
+    if action == 'download':
+        await state.clear()
+        await make_subtitles(bot=bot, sender_id=callback_query.from_user.id, url=url)
+    elif action == 'search':
         await bot.edit_message_text(
             chat_id=callback_query.from_user.id,
             message_id=callback_query.message.message_id,
             text=f"🍝 Input word to search: ")
-        # todo Call Subtitles func
         await state.set_state(StateFormMenuExtra.subtitles_search)
-
-    elif action == 'download':
+    else:
         await state.clear()
-        await bot.edit_message_text(
-            chat_id=callback_query.from_user.id,
-            message_id=callback_query.message.message_id,
-            text=f"🍱 Entirely download subtitles for: url={url}")
-
-        # todo Call Sabtitles func
 
 
 @dp.message(StateFormMenuExtra.subtitles_search)
@@ -188,10 +196,7 @@ async def case_subtitles_search(message: types.Message, state: FSMContext):
     url = data.get('url')
 
     await state.clear()
-    await message.answer(
-        text=f"🍝 Word to search: \nword={word}, url={url}")
-
-    # todo Function
+    await make_subtitles(bot=bot, sender_id=message.from_user.id, url=url, word=word)
 
 
 @dp.channel_post(Command('autodownload'))
@@ -252,7 +257,8 @@ async def run_bot_asynchronously():
         #    autodownload_file_hash = get_hash(data)
         #
         #    autodownload_chat_ids_hashed = {row: None for row in data.split('\n')}
-        #   logger.debug(f'🧮 Hashed Dict Init:  {autodownload_chat_ids_hashed}', )
+        #   logger.debug(f'🧮 Hashed Dict Init:  {autodownload_chat_ids_hashed} "', )
+        #
 
     # run_periodically(
     #             10, periodically_autodownload_chat_ids_save,
@@ -263,7 +269,6 @@ async def run_bot_asynchronously():
 
     await asyncio.gather(
         run_periodically(30, empty_dir_by_cron, {'age': 3600}),
-
         run_periodically(43200, update_pip_package_ytdlp, {}),
         dp.start_polling(bot),
     )
@@ -271,7 +276,7 @@ async def run_bot_asynchronously():
 
 def main():
     logging.info("\n")
-    logger.info(f'{BOLD_GREEN}🚀🚀  Launching bot app. Package version: {version(config.PACKAGE_NAME)} {RESET}')
+    logger.info(bold_text(green_text(f'🚀🚀  Launching bot app. Package version: {version(config.PACKAGE_NAME)}')))
 
     load_dotenv()
 

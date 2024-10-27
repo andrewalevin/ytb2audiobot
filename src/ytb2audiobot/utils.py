@@ -219,3 +219,11 @@ def pprint_format(data):
 
 def tabulation2text(text, tab='\t'):
     return '\n'.join(tab + line for line in text.splitlines())
+
+
+def green_text(text):
+    return f"\033[92m{text}\033[0m"
+
+
+def bold_text(text):
+    return f"\033[1m{text}\033[0m"

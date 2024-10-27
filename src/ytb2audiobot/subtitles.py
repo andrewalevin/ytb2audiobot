@@ -1,6 +1,6 @@
 import time
-from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled
-from src.ytb2audiobot import config
+from ytb2subtitles.ytb2subtitles import get_subtitles
+from ytb2audiobot import config
 
 
 def get_answer_text(subtitles, selected_index=None):
@@ -54,20 +54,17 @@ def format_text(text, target):
     return text
 
 
-async def get_subtitles(movie_id: str, discovered_word: str = ''):
-    try:
-        subtitles = YouTubeTranscriptApi.get_transcript(movie_id, languages=['ru'])
-    except TranscriptsDisabled:
-        return '', '⛔️ YouTubeTranscriptApi: TranscriptsDisabled'
-    except (ValueError, Exception):
-        return '', '⛔️ Undefined problem in YouTubeTranscriptApi'
+async def get_subtitles_here(url: str, discovered_word: str = ''):
+    subtitles = get_subtitles(url)
+    if not subtitles:
+        return
 
     if not discovered_word:
         text = get_answer_text(subtitles)
-        return text, ''
+        return text
 
     if not (discovered_index := get_discovered_subtitles_index(subtitles, discovered_word)):
-        return '🔦 Nothing Found! 😉', ''
+        return
 
     discovered_index = extend_discovered_index(discovered_index, len(subtitles), config.ADDITION_ROWS_NUMBER)
 
@@ -75,4 +72,4 @@ async def get_subtitles(movie_id: str, discovered_word: str = ''):
 
     text = format_text(text, discovered_word)
 
-    return text, ''
+    return text

@@ -1,14 +1,17 @@
 import asyncio
 import math
 import os
+from string import Template
 
 import yt_dlp
 from aiogram import Bot
-from aiogram.types import Message, FSInputFile
+from aiogram.types import Message, FSInputFile, BufferedInputFile
+from ytb2subtitles.ytb2subtitles import get_subtitles
 
 from ytb2audiobot import  config
 from ytb2audiobot.commands import get_big_youtube_move_id
 from ytb2audiobot.datadir import get_data_dir
+from ytb2audiobot.subtitles import get_subtitles_here
 from ytb2audiobot.logger import logger
 from ytb2audiobot.predictor import predict_downloading_time
 from ytb2audiobot.processing import download_processing
@@ -231,3 +234,32 @@ async def autodownload_work(bot: Bot, message: Message):
     else:
         autodownload_chat_ids_hashed[hash_salted] = None
         await message.reply(f'Add to Dict: {hash_salted}')
+
+
+async def make_subtitles(bot: Bot, sender_id, url: str, word: str = ''):
+    text = await get_subtitles_here(url, word)
+    logger.debug(f'🔵🟢 make_subtitles(): url={url}, word={word} \n\n text=\n{text}')
+    if not text:
+        if word:
+            text = '🔦 Nothing Found! 😉'
+        else:
+            text = 'No subtitles! 😉'
+
+    caption = f"📝 Subtitles{f': 🔎 Search word:[{word}]' if word else ''}"
+
+    if len(f'{caption}\n\n{text}') <= config.TELEGRAM_MAX_MESSAGE_TEXT_SIZE:
+        await bot.send_message(
+            chat_id=sender_id,
+            text=f'{caption}\n\n{text}',
+            parse_mode='HTML',
+            disable_web_page_preview=False)
+    else:
+        text = (text.replace('<b><s><b><s>', ' 🔹 ')
+                .replace(f'{word}</s></b></s></b>', f'{word.upper()}')
+                .replace('  ', ' '))
+        await bot.send_document(
+            chat_id=sender_id,
+            caption=caption,
+            parse_mode='HTML',
+            document=BufferedInputFile(filename='subtitles.txt', file=text.encode('utf-8'), ))
+
