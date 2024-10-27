@@ -247,7 +247,6 @@ async def make_subtitles(bot: Bot, sender_id, url: str, word: str = ''):
 
     caption = f"📝 Subtitles{f': 🔎 Search word:[{word}]' if word else ''}"
 
-
     if len(f'{caption}\n\n{text}') <= config.TELEGRAM_MAX_MESSAGE_TEXT_SIZE:
         await bot.send_message(
             chat_id=sender_id,
