@@ -11,20 +11,25 @@ permissions:
   contents: write
   packages: write
 
+env:
+  PROJECT_NAME: ytb2audiobot
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+  DOCKERHUB_USERNAME: andrewlevin
+  DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
+
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    env:
-      PROJECT_NAME: ytb2audiobot
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-      DOCKERHUB_USERNAME: andrewlevin
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-      
+  checkout_repo:
+    runs-on: ubuntu-latest  
     steps:
     - name: 🍊 😺 Checkout repository
       uses: actions/checkout@v4
 
+  pypi_package:
+    needs: checkout_repo
+    runs-on: ubuntu-latest  
+    steps:
     - name: 🥝 😺 Set up Python environment
       uses: actions/setup-python@v3
       with:
@@ -54,6 +59,10 @@ jobs:
     - name: 🐍 🏗️ Python. Build package
       run: python -m build
 
+  github_release:
+    needs: pypi_package
+    runs-on: ubuntu-latest  
+    steps:
     - name: 😺 💾 🚀 Github. Create GitHub Release
       id: create_release
       uses: actions/create-release@v1
@@ -62,7 +71,11 @@ jobs:
         release_name: ${{ env.VERSION }}
         draft: false
         prerelease: false
-
+  
+  pypi_release:
+    needs: github_release
+    runs-on: ubuntu-latest  
+    steps:
     - name: 🐍 💾 🚀 Python PyPI. Publish package
       if: steps.create_release.outputs.upload_url != ''
       uses: pypa/gh-action-pypi-publish@v1.8.6
@@ -70,6 +83,10 @@ jobs:
         user: __token__
         password: ${{ env.PYPI_API_TOKEN }}
   
+  docker:
+    needs: pypi_release
+    runs-on: ubuntu-latest  
+    steps:
     - name: 🐳 🔑 Docker. Login to Docker Hub
       uses: docker/login-action@v3
       with:
@@ -87,7 +104,11 @@ jobs:
             ${{ env.DOCKERHUB_USERNAME }}/${{ env.PROJECT_NAME }}:${{ env.VERSION }}
             ${{ env.DOCKERHUB_USERNAME }}/${{ env.PROJECT_NAME }}:latest
         platforms: linux/arm64,linux/amd64
-    
+   
+  result:
+    needs: docker
+    runs-on: ubuntu-latest  
+    steps: 
     - name: 💚 Success. Show Results. 💚
       run: |
         echo -e "💚 🐍 \t https://pypi.org/project/${PROJECT_NAME}/#history"
