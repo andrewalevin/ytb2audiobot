@@ -26,6 +26,7 @@ async def download_processing(movie_meta: dict):
     )
     filename = filename_m4a(movie_meta['title'])
 
+    # todo
     tasks = [
         download_audio_by_movie_meta(movie_meta),
         download_thumbnail_by_movie_meta(movie_meta)
@@ -37,7 +38,7 @@ async def download_processing(movie_meta: dict):
     movie_meta['thumbnail_path'] = thumbnail
 
     if not audio.exists():
-        return [], f'🔴 Download. Audio file does not exist.'
+        return []
 
     duration_seconds = movie_meta['split_duration_minutes'] * 60
 
@@ -108,4 +109,4 @@ async def download_processing(movie_meta: dict):
         }
         audio_items.append(audio_data)
 
-    return audio_items, ''
+    return audio_items

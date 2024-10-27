@@ -54,6 +54,7 @@ dependencies = [
   'urlextract',
   'ytbtimecodes',
   'yt-dlp',
+  'ytb2subtitles',
 ]
 
 

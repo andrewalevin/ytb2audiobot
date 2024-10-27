@@ -77,7 +77,8 @@ async def job_downloading(
             yt_info = ydl.extract_info(f"https://www.youtube.com/watch?v={movie_id}", download=False)
     except Exception as e:
         logger.error(f'🍅 Cant Extract YT_DLP info. \n{e}')
-        return {}
+        await info_message.edit_text(text=f'🍅 Cant Extract YT_DLP info. \n{e}')
+        return
 
     if yt_info.get('is_live'):
         await info_message.edit_text(
@@ -93,8 +94,6 @@ async def job_downloading(
         return
 
     predict_time = predict_downloading_time(yt_info.get('duration'))
-    logger.debug(f'⏰ Predict time: {predict_time}')
-
     info_message = await info_message.edit_text(text=f'⏳ Downloading ~ {seconds2humanview(predict_time)} ... ')
 
     # todo refactor Movie meta
@@ -119,19 +118,12 @@ async def job_downloading(
 
     # todo add depend on predict
     try:
-        audio_items, err = await asyncio.wait_for(
-            asyncio.create_task(download_processing(movie_meta)),
-            timeout=config.TASK_TIMEOUT_SECONDS
-        )
+        audio_items = await asyncio.wait_for(asyncio.create_task(download_processing(movie_meta)), timeout=predict_time)
     except asyncio.TimeoutError:
         await info_message.edit_text(text='🚫 Download processing timed out. Please try again later.')
         return
     except Exception as e:
         await info_message.edit_text(text=f'🚫 Error during download_processing(): \n\n{str(e)}')
-        return
-
-    if err:
-        await info_message.edit_text(text=f'🚫 Error during download_processing(): \n\n{str(err)}')
         return
 
     if not audio_items:
@@ -140,6 +132,7 @@ async def job_downloading(
 
     await info_message.edit_text('⌛🚀️ Uploading to Telegram ... ')
 
+    # todo multiple attempt
     for idx, item in enumerate(audio_items):
         logger.info(f'💚 Uploading audio item: ' + str(item.get('audio_path')))
         await bot.send_audio(
@@ -238,13 +231,8 @@ async def autodownload_work(bot: Bot, message: Message):
 
 async def make_subtitles(bot: Bot, sender_id, url: str, word: str = ''):
     text = await get_subtitles_here(url, word)
-    logger.debug(f'🔵🟢 make_subtitles(): url={url}, word={word} \n\n text=\n{text}')
-    if not text:
-        if word:
-            text = '🔦 Nothing Found! 😉'
-        else:
-            text = 'No subtitles! 😉'
 
+    text = '🔦 Nothing Found! 😉' if word else 'No subtitles! 😉' if not text else text
     caption = f"📝 Subtitles{f': 🔎 Search word:[{word}]' if word else ''}"
 
     if len(f'{caption}\n\n{text}') <= config.TELEGRAM_MAX_MESSAGE_TEXT_SIZE:
