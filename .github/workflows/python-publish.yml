@@ -20,16 +20,12 @@ env:
 
 
 jobs:
-  checkout_repo:
+  pypi_package:
     runs-on: ubuntu-latest  
     steps:
     - name: 🍊 😺 Checkout repository
       uses: actions/checkout@v4
-
-  pypi_package:
-    needs: checkout_repo
-    runs-on: ubuntu-latest  
-    steps:
+    
     - name: 🥝 😺 Set up Python environment
       uses: actions/setup-python@v3
       with:
@@ -63,6 +59,8 @@ jobs:
     needs: pypi_package
     runs-on: ubuntu-latest  
     steps:
+    - name: 🍊 😺 Checkout repository
+      uses: actions/checkout@v4
     - name: 😺 💾 🚀 Github. Create GitHub Release
       id: create_release
       uses: actions/create-release@v1
@@ -76,6 +74,8 @@ jobs:
     needs: github_release
     runs-on: ubuntu-latest  
     steps:
+    - name: 🍊 😺 Checkout repository
+      uses: actions/checkout@v4
     - name: 🐍 💾 🚀 Python PyPI. Publish package
       if: steps.create_release.outputs.upload_url != ''
       uses: pypa/gh-action-pypi-publish@v1.8.6
@@ -87,6 +87,8 @@ jobs:
     needs: pypi_release
     runs-on: ubuntu-latest  
     steps:
+    - name: 🍊 😺 Checkout repository
+      uses: actions/checkout@v4
     - name: 🐳 🔑 Docker. Login to Docker Hub
       uses: docker/login-action@v3
       with:
