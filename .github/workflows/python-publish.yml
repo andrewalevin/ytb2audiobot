@@ -87,6 +87,12 @@ jobs:
             ${{ env.DOCKERHUB_USERNAME }}/${{ env.PROJECT_NAME }}:${{ env.VERSION }}
             ${{ env.DOCKERHUB_USERNAME }}/${{ env.PROJECT_NAME }}:latest
         platforms: linux/arm64,linux/amd64
+    
+    - name: 💚 Success. Show Results. 💚
+      run: |
+        echo -e "💚 🐍 \t https://pypi.org/project/${PROJECT_NAME}/#history"
+        echo -e "💚 🐳 \t https://hub.docker.com/r/${DOCKERHUB_USERNAME}/${PROJECT_NAME}/tags"
+        
             
         
 
