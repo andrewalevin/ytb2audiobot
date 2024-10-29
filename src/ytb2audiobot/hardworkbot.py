@@ -146,6 +146,9 @@ async def job_downloading(
         logger.info(f'💚 Uploading audio item: ' + str(item.get('audio_path')))
 
         boundaries_timecodes = filter_timecodes_within_bounds(timecodes, item.get('start'), item.get('end'))
+        print('boundaries_timecodes: ')
+        print(boundaries_timecodes)
+        print()
 
         timecodes_text = get_timecodes_formatted_text(boundaries_timecodes)
 
