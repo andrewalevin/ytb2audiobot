@@ -54,10 +54,6 @@ async def get_timecodes(scheme, description):
     except Exception as e:
         return ['' for _ in range(len(scheme))], ''
 
-    #print('timestamps: ')
-    #print(timestamps)
-    #print()
-
     timecodes = []
     for idx, part in enumerate(scheme):
         output_rows = []

@@ -1,12 +1,10 @@
 import asyncio
 import math
 import os
-from string import Template
 
 import yt_dlp
 from aiogram import Bot
 from aiogram.types import Message, FSInputFile, BufferedInputFile
-from ytb2subtitles.ytb2subtitles import get_subtitles
 
 from ytb2audiobot import  config
 from ytb2audiobot.commands import get_big_youtube_move_id
@@ -14,7 +12,7 @@ from ytb2audiobot.datadir import get_data_dir
 from ytb2audiobot.subtitles import get_subtitles_here
 from ytb2audiobot.logger import logger
 from ytb2audiobot.predictor import predict_downloading_time
-from ytb2audiobot.processing import download_processing
+from ytb2audiobot.audio_download import download_processing
 from ytb2audiobot.utils import get_hash, write_file, seconds2humanview, tabulation2text, pprint_format
 
 autodownload_chat_ids_hashed = dict()

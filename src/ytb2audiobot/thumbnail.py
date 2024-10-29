@@ -1,58 +1,42 @@
 import pathlib
-import ssl
-import requests
+from ytb2audiobot.logger import logger
+from ytb2audiobot.utils import run_command
 
 
-async def image_compress_and_resize(
-        path: pathlib.Path,
-        output: pathlib.Path = None,
-        quality: int = 80,
-        thumbnail_size=(960, 960)
-):
-    return path
+async def download_thumbnail(movie_id: str, thumbnail_path: pathlib.Path):
+    """
+    Downloads a thumbnail for the given movie ID using yt-dlp and saves it as a JPEG image.
 
+    Args:
+        movie_id (str): The ID of the movie/video for which to download the thumbnail.
+        thumbnail_path (pathlib.Path): Path where the thumbnail should be saved.
 
-async def download(url: str, output):
-    output = pathlib.Path(output)
-    ssl._create_default_https_context = ssl._create_stdlib_context
+    Returns:
+        pathlib.Path: Path to the downloaded thumbnail if successful, None otherwise.
+    """
+    command = [
+        "yt-dlp", "--write-thumbnail", "--skip-download",
+        "--convert-thumbnails", "jpg", "-o", str(thumbnail_path.with_suffix('')), movie_id
+    ]
+    logger.debug(f"🏞 🔫 Command Thumbnail: {' '.join(command)}")
 
-    try:
-        response = requests.get(url, stream=True)
-        if response.status_code == 200:
-            with output.open('wb') as f:
-                f.write(response.content)
-        else:
-            print(f'🟠 Thumbnail. Not a 200 valid code. Response code: {response.status_code}.')
-            return
-    except Exception as e:
-        print(f'🟠 Thumbnail. Failed to download. Exception: {e}.')
-        return
+    stdout, stderr, return_code = await run_command(command)
 
-    return output
+    # Log stdout and stderr output line by line
+    for line in stdout.splitlines():
+        logger.debug(line)
+    for line in stderr.splitlines():
+        logger.error(line)
 
+    # Check for errors or missing file
+    if return_code != 0:
+        logger.error(f"🏞 Thumbnail download failed for movie ID: {movie_id} with return code {return_code}")
+        return None
 
-async def download_thumbnail_by_movie_meta(movie_meta: dict):
+    if not thumbnail_path.exists():
+        logger.error(f"🏞 Thumbnail file not found at {thumbnail_path}")
+        return None
 
-    data_dir = pathlib.Path(movie_meta['store'])
+    logger.info(f"🏞 Thumbnail successfully downloaded at {thumbnail_path}")
+    return thumbnail_path
 
-    data_dir.mkdir(parents=True, exist_ok=True)
-
-    thumbnail = data_dir.joinpath(movie_meta['id'] + '-thumbnail.jpg')
-
-    if thumbnail.exists():
-        print(f'💕 Thumbnail file yet exists: {thumbnail}')
-        return thumbnail
-
-    # Special SSL setting to make valid HTTP request to Youtube server.
-    ssl._create_default_https_context = ssl._create_stdlib_context
-
-    thumbnail = await download(movie_meta['thumbnail_url'], thumbnail)
-    if not thumbnail:
-        thumbnail = await download(movie_meta['thumbnail_url'], thumbnail)
-    if not thumbnail:
-        return
-
-    if not thumbnail.exists():
-        return
-
-    return thumbnail

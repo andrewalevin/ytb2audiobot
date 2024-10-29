@@ -1,19 +1,35 @@
 import asyncio
+import pathlib
 import math
 from datetime import timedelta
 from string import Template
 
-from audio2splitted.audio2splitted import get_split_audio_scheme, \
-    make_split_audio
+from audio2splitted.audio2splitted import get_split_audio_scheme, make_split_audio
+from ytb2audio.ytb2audio import download_audio
 
 from ytb2audiobot import config
 from ytb2audiobot.mp4mutagen import get_mp4object
 from ytb2audiobot.thumbnail import image_compress_and_resize
 from ytb2audiobot.timecodes import get_timecodes, filter_timestamp_format
-from ytb2audiobot.thumbnail import download_thumbnail_by_movie_meta
-from ytb2audiobot.audio import download_audio_by_movie_meta
+from ytb2audiobot.thumbnail import download_thumbnail
 from ytb2audiobot.utils import capital2lower, filename_m4a, get_file_size
 from ytb2audiobot.logger import logger
+from ytb2audiobot.predictor import predict_downloading_time
+
+
+async def download_audio_by_movie_meta(movie_meta: dict):
+    data_dir = pathlib.Path(movie_meta['store'])
+    path = data_dir.joinpath(movie_meta['id'] + '.m4a')
+    if path.exists():
+        return path
+
+    audio = await download_audio(
+        movie_id=movie_meta['id'],
+        data_dir=movie_meta['store'],
+        ytdlprewriteoptions=movie_meta['ytdlprewriteoptions']
+    )
+
+    return pathlib.Path(audio)
 
 
 async def download_processing(movie_meta: dict):
@@ -26,12 +42,14 @@ async def download_processing(movie_meta: dict):
     )
     filename = filename_m4a(movie_meta['title'])
 
-    # todo
-    tasks = [
+    movie_id = movie_meta['id']
+    thumbnail_path = pathlib.Path(movie_meta['store']).joinpath(movie_meta['id'] + '-thumbnail.jpg')
+
+    results = await asyncio.gather(
         download_audio_by_movie_meta(movie_meta),
-        download_thumbnail_by_movie_meta(movie_meta)
-    ]
-    results = await asyncio.gather(*tasks)
+        download_thumbnail(movie_id, thumbnail_path),
+        return_exceptions=False
+    )
 
     audio = results[0]
     thumbnail = results[1]
