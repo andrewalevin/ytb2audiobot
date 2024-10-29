@@ -1,8 +1,6 @@
 import logging
-import os
 import pathlib
 from string import Template
-
 from ytb2audio.ytb2audio import YT_DLP_OPTIONS_DEFAULT
 
 # main
@@ -34,7 +32,6 @@ $subtitles
 
 TELEGRAM_MAX_MESSAGE_TEXT_SIZE = 4096 - 4
 
-TASK_TIMEOUT_SECONDS = 60 * 180
 
 # processing
 
@@ -80,10 +77,9 @@ DEFAULT_MOVIE_META = {
     'store': pathlib.Path('data')
 }
 
-TELEGRAM_MAX_AUDIO_BOT_FILE_SIZE_BYTES_BINARY = 46000000
-TELEGRAM_MAX_AUDIO_BOT_FILE_SIZE_BYTES_BINARY = 3000000
 
-###### Commands
+TELEGRAM_MAX_AUDIO_BOT_FILE_SIZE_BYTES_BINARY = 3300000
+
 
 COMMANDS_SPLIT = [
     {'name': 'split', 'alias': 'split'},

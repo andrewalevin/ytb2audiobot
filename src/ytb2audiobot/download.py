@@ -76,7 +76,10 @@ async def audio_download(
     if audio_path.exists():
         return audio_path
 
-    audio_result_path = await download_audio(movie_id=movie_id, data_dir=audio_path.parent, ytdlprewriteoptions=ytdlprewriteoptions)
+    audio_result_path = await download_audio(
+        movie_id=movie_id,
+        data_dir=audio_path.parent,
+        ytdlprewriteoptions=ytdlprewriteoptions)
     if not audio_result_path or not audio_result_path.exists():
         return None
 
@@ -106,10 +109,10 @@ async def download_processing(
 
     scheme = get_split_audio_scheme(
         source_audio_length=duration,
-        duration_seconds=60*39,
+        duration_seconds=60*18,
         delta_seconds=config.AUDIO_SPLIT_DELTA_SECONDS,
         magic_tail=True,
-        threshold_seconds=60*101
+        threshold_seconds=60*18
     )
     if len(scheme) == 1:
         size = await get_file_size(audio)
@@ -145,9 +148,3 @@ async def download_processing(
         })
 
     return audio_items
-
-
-
-
-
-

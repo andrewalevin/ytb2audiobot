@@ -1,7 +1,5 @@
 import logging
 import os
-import sys
-
 
 # Custom date format without milliseconds
 DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
@@ -18,6 +16,7 @@ console_handler = logging.StreamHandler()
 
 BOLD_GREEN = "\033[1;32m"  # Bold green
 RESET = "\033[0m"          # Reset
+
 
 # Custom filter to apply different formatters based on log level
 class CustomFilter(logging.Filter):
@@ -67,7 +66,7 @@ console_handler.addFilter(CustomFilter())
 # Set up the root logger
 logger = logging.getLogger('customLogger')
 
-#logger.addHandler(console_handler)
+
 ch = logging.StreamHandler()
 ch.setFormatter(CustomFormatter())
 logger.addHandler(ch)
@@ -79,5 +78,3 @@ if os.getenv('DEBUG', 'false') == 'true':
 
 # Export the logger
 __all__ = ['logger']
-
-

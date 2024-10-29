@@ -2,23 +2,24 @@ import logging
 import os
 import argparse
 import asyncio
+from dotenv import load_dotenv
+from importlib.metadata import version
 
+from aiogram import Bot, Dispatcher, types, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import default_state, StatesGroup, State
-from dotenv import load_dotenv
-from aiogram import Bot, Dispatcher, types, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.filters import CommandStart, Command, StateFilter
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+
 from ytb2audiobot import config
 from ytb2audiobot.cron import run_periodically, empty_dir_by_cron
-from ytb2audiobot.datadir import get_data_dir
 from ytb2audiobot.hardworkbot import direct_message_and_post_work, autodownload_work, job_downloading, make_subtitles
 from ytb2audiobot.logger import logger
-from ytb2audiobot.utils import remove_all_in_dir, green_text, bold_text
+from ytb2audiobot.utils import remove_all_in_dir, green_text, bold_text, get_data_dir
 from ytb2audiobot.cron import update_pip_package_ytdlp
-from importlib.metadata import version
+
 
 bot = Bot(token=config.DEFAULT_TELEGRAM_TOKEN_IMAGINARY)
 storage = MemoryStorage()

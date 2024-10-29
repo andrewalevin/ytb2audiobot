@@ -1,16 +1,14 @@
 import asyncio
 import datetime
-
-from ytb2audiobot.datadir import get_data_dir
-from ytb2audiobot.utils import delete_file_async
-
-from ytb2audiobot.utils import run_command
+from ytb2audiobot.utils import delete_file_async, get_data_dir, run_command
 from ytb2audiobot.logger import logger
 
-data_dir = get_data_dir()
 
+async def update_pip_package_ytdlp(params: dict):
+    """
 
-async def update_pip_package_ytdlp(params):
+    :type params: object
+    """
     stdout, stderr, return_code = await run_command('pip install --upgrade yt-dlp --root-user-action=ignore')
 
     sign = 'Success! ✅' if return_code == 0 else 'Failure! ❌'
@@ -25,6 +23,8 @@ async def update_pip_package_ytdlp(params):
 async def empty_dir_by_cron(params):
     if not params.get('age'):
         return
+
+    data_dir = get_data_dir()
 
     now = int(datetime.datetime.now().timestamp())
     for file in data_dir.iterdir():

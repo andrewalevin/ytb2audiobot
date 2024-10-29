@@ -1,14 +1,20 @@
 import asyncio
-import hashlib
 import json
 import os
-import pathlib
 import pprint
 import re
-from pathlib import Path
-
+import pathlib
+import datetime
 import aiofiles
 import aiofiles.os
+from urlextract import URLExtract
+import tempfile
+import zlib
+import hashlib
+from ytb2audio.ytb2audio import get_youtube_move_id
+
+from ytb2audiobot import config
+
 
 CAPITAL_LETTERS_PERCENT_THRESHOLD = 0.3
 
@@ -26,7 +32,7 @@ async def create_directory_async(path):
     return path
 
 
-async def delete_file_async(path: Path):
+async def delete_file_async(path: pathlib.Path):
     try:
         async with aiofiles.open(path, 'r'):  # Ensure the file exists
             pass
@@ -97,9 +103,6 @@ def get_filename_m4a(text):
     return f'{name}.m4a'
 
 
-import datetime
-
-
 def seconds2humanview(seconds):
     # Create a timedelta object representing the duration
     duration = datetime.timedelta(seconds=seconds)
@@ -145,6 +148,7 @@ def write_json(path: str, data: dict) -> str:
 
     return path.as_posix()
 
+
 async def get_file_size1(path):
     path = pathlib.Path(path)
     print('⛺️: ', path)
@@ -158,7 +162,6 @@ async def get_file_size1(path):
 
 
 async def get_file_size(file_path):
-    size = 0
     try:
         async with aiofiles.open(file_path, mode='rb') as f:
             # Move the cursor to the end of the file
@@ -194,8 +197,7 @@ async def run_command(cmd):
     return stdout.decode(), stderr.decode(), process.returncode
 
 
-def remove_all_in_dir(data_dir: Path):
-    # Удаление всех файлов и каталогов
+def remove_all_in_dir(data_dir: pathlib.Path):
     for item in data_dir.iterdir():
         if item.is_file():
             item.unlink()
@@ -205,7 +207,7 @@ def remove_all_in_dir(data_dir: Path):
                     subitem.unlink()
                 elif subitem.is_dir():
                     subitem.rmdir()
-            item.rmdir()  # Удаление пустого каталога
+            item.rmdir()
 
 
 def pprint_format(data):
@@ -227,3 +229,75 @@ def green_text(text):
 
 def bold_text(text):
     return f"\033[1m{text}\033[0m"
+
+
+def is_youtube_url(text):
+
+    for domain in config.YOUTUBE_DOMAINS:
+        if domain in text:
+            return True
+    return False
+
+
+def get_big_youtube_move_id(text):
+    text = text.strip()
+    if not is_youtube_url(text):
+        return ''
+
+    urls = URLExtract().find_urls(text)
+    url = ''
+    for url in urls:
+        url = url.strip()
+        if is_youtube_url(url):
+            break
+
+    movie_id = get_youtube_move_id(url)
+    if not movie_id:
+        return ''
+
+    return movie_id
+
+
+def get_md5(data, length=999999999):
+    md5_hash = hashlib.md5()
+    md5_hash.update(data.encode('utf-8'))
+    return md5_hash.hexdigest()[:length]
+
+
+def get_hash_adler32(text):
+    return zlib.adler32(text.encode('utf-8'))
+
+
+def get_data_dir():
+    _hash = hex(get_hash_adler32(pathlib.Path.cwd().as_posix()))[-8:]
+    temp_dir = pathlib.Path(tempfile.gettempdir())
+
+    if temp_dir.exists():
+        data_dir = temp_dir.joinpath(f'{config.DIRNAME_IN_TEMPDIR}-{_hash}')
+        data_dir.mkdir(parents=True, exist_ok=True)
+
+        symlink = pathlib.Path(config.DIRNAME_DATA)
+        if not symlink.exists():
+            symlink.symlink_to(data_dir)
+
+        return symlink
+    else:
+        data_dir = pathlib.Path(config.DIRNAME_DATA)
+        if data_dir.is_symlink():
+            try:
+                data_dir.unlink()
+            except Exception as e:
+                print(f'❌ Error symlink unlink: {e}')
+
+        data_dir.mkdir(parents=True, exist_ok=True)
+
+        return data_dir
+
+
+def round_to_10(number):
+    return round(number / 10) * 10
+
+
+def predict_downloading_time(duration):
+    time = int(0.04 * duration + 10)
+    return round_to_10(time)

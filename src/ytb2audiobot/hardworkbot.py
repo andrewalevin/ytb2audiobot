@@ -10,14 +10,12 @@ from ytbtimecodes.timecodes import extract_timecodes, timedelta_from_seconds, st
     filter_timecodes_within_bounds
 
 from ytb2audiobot import  config
-from ytb2audiobot.commands import get_big_youtube_move_id
 from ytb2audiobot.config import get_thumbnail_path
-from ytb2audiobot.datadir import get_data_dir
 from ytb2audiobot.subtitles import get_subtitles_here
 from ytb2audiobot.logger import logger
-from ytb2audiobot.predictor import predict_downloading_time
 from ytb2audiobot.download import download_processing, get_timecodes_formatted_text
-from ytb2audiobot.utils import get_hash, write_file, seconds2humanview, capital2lower, get_filename_m4a
+from ytb2audiobot.utils import get_hash, write_file, seconds2humanview, capital2lower, get_filename_m4a, \
+    predict_downloading_time, get_data_dir, get_big_youtube_move_id
 
 autodownload_chat_ids_hashed = dict()
 autodownload_file_hash = ''

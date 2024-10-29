@@ -8,4 +8,3 @@ def read_autodownload_chat_ids_hashed():
     with config.AUTODOWNLOAD_CHAT_IDS_HASHED_PATH.open(mode='r') as file:
         data = file.read()
         return {row: None for row in data.split('\n')}
-
