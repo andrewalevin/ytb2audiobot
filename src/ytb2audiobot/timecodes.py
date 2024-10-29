@@ -38,11 +38,28 @@ def filter_timestamp_format(_time):
     return _time.replace('@@', '').replace('##', '')
 
 
-async def get_timecodes(scheme, description):
-    #print('🛍 get_timecodes: ')
-    #print('description: ', description)
-    #print()
+def get_boundaries_timecodes(timecodes, start, end):
+    outputs = []
+    for timecode in timecodes:
+        if int(timecode.get('timecode')) < int(start) or int(end) < int(timecode.get('timecode')):
+            continue
+        outputs.append(timecode)
+    return outputs
 
+
+def get_timecodes_formatted_text(timecodes: list):
+    if not timecodes:
+        return ''
+
+    rows = []
+    for stamp in timecodes:
+        _time = filter_timestamp_format(datetime.timedelta(seconds=stamp.get('timecode')))
+        _title = capital2lower(stamp.get('title'))
+        rows.append(f'{_time} - {_title}')
+    return '\n'.join(rows)
+
+
+async def get_timecodes(scheme, description):
     if not isinstance(description, str):
         if isinstance(description, list):
             description = description[0]
@@ -54,16 +71,16 @@ async def get_timecodes(scheme, description):
     except Exception as e:
         return ['' for _ in range(len(scheme))], ''
 
+    print('♏️ Timestamps: ', timestamps)
+    print()
+
     timecodes = []
     for idx, part in enumerate(scheme):
-        output_rows = []
-        for stamp in timestamps:
-            if int(stamp.get('timecode')) < int(part[0]) or int(part[1]) < int(stamp.get('timecode')):
-                continue
-            time = filter_timestamp_format(datetime.timedelta(seconds=stamp.get('timecode') - part[0]))
-            title = capital2lower(stamp.get('title'))
+        start = part[0]
+        end = part[1]
 
-            output_rows.append(f'{time} - {title}')
-        timecodes.append('\n'.join(output_rows))
+        boundaries_timecodes = get_boundaries_timecodes(timestamps, start, end)
+        _text = get_timecodes_formatted_text(boundaries_timecodes)
+        timecodes.append(_text)
 
-    return timecodes, ''
+    return timecodes

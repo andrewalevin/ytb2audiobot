@@ -1,19 +1,25 @@
 import asyncio
 import math
 import os
+from datetime import timedelta
+from string import Template
 
 import yt_dlp
 from aiogram import Bot
 from aiogram.types import Message, FSInputFile, BufferedInputFile
+from ytbtimecodes.timecodes import get_all_timecodes
 
 from ytb2audiobot import  config
 from ytb2audiobot.commands import get_big_youtube_move_id
+from ytb2audiobot.config import get_thumbnail_path
 from ytb2audiobot.datadir import get_data_dir
 from ytb2audiobot.subtitles import get_subtitles_here
 from ytb2audiobot.logger import logger
 from ytb2audiobot.predictor import predict_downloading_time
 from ytb2audiobot.audio_download import download_processing
-from ytb2audiobot.utils import get_hash, write_file, seconds2humanview, tabulation2text, pprint_format
+from ytb2audiobot.timecodes import get_boundaries_timecodes, get_timecodes_formatted_text, filter_timestamp_format
+from ytb2audiobot.utils import get_hash, write_file, seconds2humanview, tabulation2text, pprint_format, capital2lower, \
+    get_filename_m4a
 
 autodownload_chat_ids_hashed = dict()
 autodownload_file_hash = ''
@@ -39,6 +45,10 @@ async def periodically_autodownload_chat_ids_save(params):
     if autodownload_file_hash != data_hash:
         await write_file(config.AUTODOWNLOAD_CHAT_IDS_HASHED_PATH, data_to_write)
         autodownload_file_hash = data_hash
+
+
+def trim_caption(caption):
+    return caption[:config.TG_CAPTION_MAX_LONG - 32] + config.CAPTION_TRIMMED_END_TEXT
 
 
 async def job_downloading(
@@ -98,7 +108,11 @@ async def job_downloading(
 
     movie_meta = config.DEFAULT_MOVIE_META.copy()
     movie_meta['id'] = movie_id
-    movie_meta['store'] = get_data_dir()
+    data_dir = get_data_dir()
+    movie_meta['store'] = data_dir
+
+    title = yt_info.get('title')
+    description = yt_info.get('description')
 
     mapping = {
         'title': 'title',
@@ -116,11 +130,13 @@ async def job_downloading(
 
     # todo add depend on predict
     try:
-        audio_items = await asyncio.wait_for(asyncio.create_task(download_processing(movie_meta)), timeout=config.TASK_TIMEOUT_SECONDS)
+        audio_items = await asyncio.wait_for(
+            asyncio.create_task(download_processing(movie_meta, description)),timeout=config.TASK_TIMEOUT_SECONDS)
     except asyncio.TimeoutError:
         await info_message.edit_text(text='🚫 Download processing timed out. Please try again later.')
         return
     except Exception as e:
+        logger.error(f'🚫 Error during download_processing(): {e}')
         await info_message.edit_text(text=f'🚫 Error during download_processing(): \n\n{str(e)}')
         return
 
@@ -128,18 +144,43 @@ async def job_downloading(
         await info_message.edit_text(text='💔 Nothing to send you after downloading. Sorry :(')
         return
 
-    await info_message.edit_text('⌛🚀️ Uploading to Telegram ... ')
+    thumbnail_path = get_thumbnail_path(data_dir, movie_id)
+    try:
+        timecodes = get_all_timecodes(description)
+    except Exception as e:
+        timecodes = []
 
-    # todo multiple attempt
+    filename = get_filename_m4a(title)
+    caption_head = config.CAPTION_HEAD_TEMPLATE.safe_substitute(
+        movieid=movie_meta['id'],
+        title=capital2lower(title),
+        author=capital2lower(yt_info.get('uploader')),
+    )
+
+    await info_message.edit_text('⌛🚀️ Uploading to Telegram ... ')
     for idx, item in enumerate(audio_items):
         logger.info(f'💚 Uploading audio item: ' + str(item.get('audio_path')))
+
+        boundaries_timecodes = get_boundaries_timecodes(timecodes, item.get('start'), item.get('end'))
+
+        timecodes_text = get_timecodes_formatted_text(boundaries_timecodes)
+
+        caption = Template(caption_head).safe_substitute(
+            partition='' if len(audio_items) == 1 else f'[Part {idx+1} of {len(audio_items)}]',
+            duration=filter_timestamp_format(timedelta(seconds=item.get('duration') + 1)),
+            timecodes=timecodes_text,
+            additional=movie_meta['additional_meta_text']
+        )
+
         await bot.send_audio(
             chat_id=sender_id,
             reply_to_message_id=message_id,
-            audio=FSInputFile(path=item.get('audio_path'), filename=item.get('audio_filename')),
+            audio=FSInputFile(
+                path=item.get('audio_path'),
+                filename=filename if len(audio_items) == 1 else f'p{idx+1}_of{len(audio_items)} {filename}'),
             duration=item.get('duration'),
-            thumbnail=FSInputFile(path=item.get('thumbnail_path')) if item.get('thumbnail_path') else None,
-            caption=item.get('caption'),
+            thumbnail=FSInputFile(path=thumbnail_path) if thumbnail_path.exists() else None,
+            caption=caption if len(caption) < config.TG_CAPTION_MAX_LONG else trim_caption(caption),
             parse_mode='HTML'
         )
 

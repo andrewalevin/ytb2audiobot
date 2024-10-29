@@ -14,11 +14,12 @@ async def download_thumbnail(movie_id: str, thumbnail_path: pathlib.Path):
     Returns:
         pathlib.Path: Path to the downloaded thumbnail if successful, None otherwise.
     """
-    command = [
-        "yt-dlp", "--write-thumbnail", "--skip-download",
-        "--convert-thumbnails", "jpg", "-o", str(thumbnail_path.with_suffix('')), movie_id
-    ]
-    logger.debug(f"🏞 🔫 Command Thumbnail: {' '.join(command)}")
+    if thumbnail_path.exists():
+        return thumbnail_path
+
+    command = f'yt-dlp --write-thumbnail --skip-download --convert-thumbnails jpg -o {thumbnail_path.with_suffix('')} {movie_id}'
+
+    logger.debug(f"🏞 🔫 Command Thumbnail: {command}")
 
     stdout, stderr, return_code = await run_command(command)
 

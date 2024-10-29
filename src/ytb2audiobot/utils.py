@@ -88,7 +88,7 @@ def capital2lower(text):
     return make_first_capital(text.lower())
 
 
-def filename_m4a(text):
+def get_filename_m4a(text):
     name = (re.sub(r'[^\w\s\-\_\(\)\[\]]', ' ', text)
             .replace('    ', ' ')
             .replace('   ', ' ')

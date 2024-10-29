@@ -36,7 +36,6 @@ TELEGRAM_MAX_MESSAGE_TEXT_SIZE = 4096 - 4
 
 TASK_TIMEOUT_SECONDS = 60 * 180
 
-
 # processing
 
 SEND_AUDIO_TIMEOUT = 120
@@ -83,8 +82,6 @@ DEFAULT_MOVIE_META = {
 
 TELEGRAM_MAX_AUDIO_BOT_FILE_SIZE_BYTES_BINARY = 46000000
 TELEGRAM_MAX_AUDIO_BOT_FILE_SIZE_BYTES_BINARY = 3000000
-
-
 
 ###### Commands
 
@@ -153,19 +150,16 @@ YOUTUBE_DOMAINS = ['youtube.com', 'youtu.be']
 
 PARAMS_MAX_COUNT = 2
 
-
 # datadir
 
 DIRNAME_IN_TEMPDIR = 'pip-ytb2audiobot-data'
 DIRNAME_DATA = 'data'
-
 
 # subtitles
 
 FORMAT_TEMPLATE = Template('<b><s>$text</s></b>')
 ADDITION_ROWS_NUMBER = 1
 IS_TEXT_FORMATTED = True
-
 
 # timecodes
 
@@ -178,7 +172,6 @@ youtu.be/iI3qo1Bxi0o
 
 '''
 
-
 TELEGRAM_BOT_FILE_MAX_SIZE_BYTES = 47000000
 
 TIMERS_FILE_PATH = pathlib.Path('timers.log')
@@ -188,7 +181,6 @@ AUTODOWNLOAD_CHAT_IDS_HASHED_PATH = pathlib.Path('autodownload_chat_ids_hashed.t
 LOG_LEVEL = logging.DEBUG
 
 DEFAULT_TELEGRAM_TOKEN_IMAGINARY = '123456789:AAE_O0RiWZRJOeOB8Nn8JWia_uUTqa2bXGU'
-
 
 # Function to set the environment variable
 # config.py
@@ -201,3 +193,11 @@ PACKAGE_NAME = 'ytb2audiobot'
 
 YOUTUBE_URL = Template('youtu.be/$movieid')
 TIMEOUT_DOWNLOAD_PROCESSING_MULTIPLIRE_BY_PREDICT_TIME = 1
+
+
+def get_thumbnail_path(data_dir, movie_id):
+    return pathlib.Path(data_dir).joinpath(f'{movie_id}-thumbnail.jpg')
+
+
+def get_audio_path(data_dir, movie_id):
+    return pathlib.Path(data_dir).joinpath(f'{movie_id}.m4a')

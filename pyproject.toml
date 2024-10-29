@@ -47,7 +47,6 @@ dependencies = [
   'aiogram',
   'python-dotenv',
   'pytube',
-  'mutagen',
   'youtube-transcript-api',
   'pyyaml',
   'aiofiles',
