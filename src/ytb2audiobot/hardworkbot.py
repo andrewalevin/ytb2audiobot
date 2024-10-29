@@ -1,13 +1,13 @@
 import asyncio
 import math
 import os
-from datetime import timedelta
 from string import Template
 
 import yt_dlp
 from aiogram import Bot
 from aiogram.types import Message, FSInputFile, BufferedInputFile
-from ytbtimecodes.timecodes import get_all_timecodes
+from ytbtimecodes.timecodes import extract_timecodes, timedelta_from_seconds, standardize_time_format, \
+    filter_timecodes_within_bounds
 
 from ytb2audiobot import  config
 from ytb2audiobot.commands import get_big_youtube_move_id
@@ -16,10 +16,8 @@ from ytb2audiobot.datadir import get_data_dir
 from ytb2audiobot.subtitles import get_subtitles_here
 from ytb2audiobot.logger import logger
 from ytb2audiobot.predictor import predict_downloading_time
-from ytb2audiobot.audio_download import download_processing
-from ytb2audiobot.timecodes import get_boundaries_timecodes, get_timecodes_formatted_text, filter_timestamp_format
-from ytb2audiobot.utils import get_hash, write_file, seconds2humanview, tabulation2text, pprint_format, capital2lower, \
-    get_filename_m4a
+from ytb2audiobot.download import download_processing, get_timecodes_formatted_text
+from ytb2audiobot.utils import get_hash, write_file, seconds2humanview, capital2lower, get_filename_m4a
 
 autodownload_chat_ids_hashed = dict()
 autodownload_file_hash = ''
@@ -104,34 +102,22 @@ async def job_downloading(
     predict_time = predict_downloading_time(yt_info.get('duration'))
     info_message = await info_message.edit_text(text=f'⏳ Downloading ~ {seconds2humanview(predict_time)} ... ')
 
-    # todo refactor Movie meta
-
-    movie_meta = config.DEFAULT_MOVIE_META.copy()
-    movie_meta['id'] = movie_id
     data_dir = get_data_dir()
-    movie_meta['store'] = data_dir
-
     title = yt_info.get('title')
     description = yt_info.get('description')
-
-    mapping = {
-        'title': 'title',
-        'description': 'description',
-        'uploader': 'author',
-        'thumbnail': 'thumbnail_url',
-        'duration': 'duration'
-    }
-
-    for yt_key, meta_key in mapping.items():
-        if yt_info.get(yt_key):
-            movie_meta[meta_key] = yt_info.get(yt_key)
-
-    logger.debug(f'🚦 Movie meta: \n{tabulation2text(pprint_format(movie_meta))}')
+    duration = yt_info.get('duration')
+    author = yt_info.get('uploader')
 
     # todo add depend on predict
     try:
         audio_items = await asyncio.wait_for(
-            asyncio.create_task(download_processing(movie_meta, description)),timeout=config.TASK_TIMEOUT_SECONDS)
+            asyncio.create_task(
+                download_processing(
+                    movie_id=movie_id,
+                    data_dir=data_dir,
+                    duration=duration,
+                    ytdlprewriteoptions=config.YT_DLP_OPTIONS_DEFAULT)),
+            timeout=config.TASK_TIMEOUT_SECONDS)
     except asyncio.TimeoutError:
         await info_message.edit_text(text='🚫 Download processing timed out. Please try again later.')
         return
@@ -146,30 +132,30 @@ async def job_downloading(
 
     thumbnail_path = get_thumbnail_path(data_dir, movie_id)
     try:
-        timecodes = get_all_timecodes(description)
+        timecodes = extract_timecodes(description)
     except Exception as e:
         timecodes = []
 
     filename = get_filename_m4a(title)
     caption_head = config.CAPTION_HEAD_TEMPLATE.safe_substitute(
-        movieid=movie_meta['id'],
+        movieid=movie_id,
         title=capital2lower(title),
-        author=capital2lower(yt_info.get('uploader')),
+        author=capital2lower(author),
     )
 
     await info_message.edit_text('⌛🚀️ Uploading to Telegram ... ')
     for idx, item in enumerate(audio_items):
         logger.info(f'💚 Uploading audio item: ' + str(item.get('audio_path')))
 
-        boundaries_timecodes = get_boundaries_timecodes(timecodes, item.get('start'), item.get('end'))
+        boundaries_timecodes = filter_timecodes_within_bounds(timecodes, item.get('start'), item.get('end'))
 
         timecodes_text = get_timecodes_formatted_text(boundaries_timecodes)
 
         caption = Template(caption_head).safe_substitute(
             partition='' if len(audio_items) == 1 else f'[Part {idx+1} of {len(audio_items)}]',
-            duration=filter_timestamp_format(timedelta(seconds=item.get('duration') + 1)),
+            duration=standardize_time_format(timedelta_from_seconds(item.get('duration') + 1)),
             timecodes=timecodes_text,
-            additional=movie_meta['additional_meta_text']
+            additional=''
         )
 
         await bot.send_audio(
