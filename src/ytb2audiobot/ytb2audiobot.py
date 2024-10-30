@@ -47,7 +47,7 @@ class StateFormMenuExtra(StatesGroup):
 
 
 ADVANCED_OPTIONS_TEXT = '''
-🪲 Iusuf 🎬 Advanced options can help you to:
+🪲 🎬 Advanced options can help you to:
     
     -	✂️ Split audio into parts of a desired length
     -	🎷 Bitrate adjustment for audio
