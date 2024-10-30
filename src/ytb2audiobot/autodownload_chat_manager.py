@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Union
 from ytb2audiobot.utils import get_hash
 
+# todo add check pkl with hash of bot name
+
 
 class AutodownloadChatManager:
     def __init__(self, data_dir: Union[str, Path]):
