@@ -1,60 +1,32 @@
 import asyncio
 import math
-import os
 from string import Template
 
 import yt_dlp
 from aiogram import Bot
-from aiogram.types import Message, FSInputFile, BufferedInputFile
+from aiogram.types import FSInputFile, BufferedInputFile
 from ytbtimecodes.timecodes import extract_timecodes, timedelta_from_seconds, standardize_time_format, \
     filter_timecodes_within_bounds
 
 from ytb2audiobot import  config
 from ytb2audiobot.config import get_thumbnail_path
-from ytb2audiobot.subtitles import get_subtitles_here
+from ytb2audiobot.subtitles import get_subtitles_here, highlight_words_file_text
 from ytb2audiobot.logger import logger
 from ytb2audiobot.download import download_processing, get_timecodes_formatted_text
-from ytb2audiobot.utils import get_hash, write_file, seconds2humanview, capital2lower, get_filename_m4a, \
-    predict_downloading_time, get_data_dir, get_big_youtube_move_id
-
-autodownload_chat_ids_hashed = dict()
-autodownload_file_hash = ''
-
-
-def check_chat_id_in_dict(chat_id):
-    if get_hash_salted(chat_id) in autodownload_chat_ids_hashed:
-        return True
-    return False
-
-
-def get_hash_salted(data):
-    salt = os.environ.get('SALT', '')
-    return get_hash(get_hash(data) + salt)
-
-
-async def periodically_autodownload_chat_ids_save(params):
-    data_to_write = '\n'.join(sorted(autodownload_chat_ids_hashed.keys())).strip()
-
-    data_hash = get_hash(data_to_write)
-
-    global autodownload_file_hash
-    if autodownload_file_hash != data_hash:
-        await write_file(config.AUTODOWNLOAD_CHAT_IDS_HASHED_PATH, data_to_write)
-        autodownload_file_hash = data_hash
-
-
-def trim_caption(caption):
-    return caption[:config.TG_CAPTION_MAX_LONG - 32] + config.CAPTION_TRIMMED_END_TEXT
+from ytb2audiobot.utils import seconds2humanview, capital2lower, get_filename_m4a, \
+    predict_downloading_time, get_data_dir, get_big_youtube_move_id, trim_caption_to_telegram_send
 
 
 async def job_downloading(
         bot: Bot,
         sender_id: int,
         message_id: id,
-        movie_id: str,
-        info_message_id: int = 0
-):
-    logger.info(f'🐝 Making job_downloading(): sender_id={sender_id}, message_id={message_id}, movie_id={movie_id}')
+        message_text: str,
+        info_message_id: int = 0):
+
+    movie_id = get_big_youtube_move_id(message_text)
+    if not movie_id:
+        return
 
     # Inverted logic refactor
     info_message = await bot.send_message(
@@ -73,8 +45,7 @@ async def job_downloading(
         'logtostderr': False,  # Avoids logging to stderr, logs to the logger instead
         'quiet': True,  # Suppresses default output,
         'nocheckcertificate': True,
-        'no_warnings': True,
-    }
+        'no_warnings': True}
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -113,8 +84,7 @@ async def job_downloading(
                 download_processing(
                     movie_id=movie_id,
                     data_dir=data_dir,
-                    duration=duration,
-                    ytdlprewriteoptions=config.YT_DLP_OPTIONS_DEFAULT)),
+                    duration=duration)),
             timeout=config.TASK_TIMEOUT_SECONDS)
     except asyncio.TimeoutError:
         await info_message.edit_text(text='🚫 Download processing timed out. Please try again later.')
@@ -167,7 +137,7 @@ async def job_downloading(
                 filename=filename if len(audio_items) == 1 else f'p{idx+1}_of{len(audio_items)} {filename}'),
             duration=item.get('duration'),
             thumbnail=FSInputFile(path=thumbnail_path) if thumbnail_path.exists() else None,
-            caption=caption if len(caption) < config.TG_CAPTION_MAX_LONG else trim_caption(caption),
+            caption=caption if len(caption) < config.TG_CAPTION_MAX_LONG else trim_caption_to_telegram_send(caption),
             parse_mode='HTML'
         )
 
@@ -181,99 +151,27 @@ async def job_downloading(
     logger.info(f'💚💚 Done! ')
 
 
-async def direct_message_and_post_work(bot: Bot, message: Message):
-
-    logger.debug('💈 Handler. Direct Message and Post')
-
-    sender_id = (
-        message.from_user.id if message.from_user else
-        message.sender_chat.id if message.sender_chat else
-        None
-    )
-
-    # Return if sender_id is not found or if the message has no text
-    if not sender_id or not message.text:
-        return
-
-    movie_id = get_big_youtube_move_id(message.text)
-    logger.debug(f'🔫 movie_id={movie_id}')
-
-    if not movie_id:
-        # todo
-        return
-
-    await job_downloading(
-        bot=bot,
-        sender_id=sender_id,
-        message_id=message.message_id,
-        movie_id=movie_id)
-
-    # todo LATER
-    if False:
-        if check_chat_id_in_dict(sender_id):
-            await job_downloading(
-                sender_id=sender_id,
-                message_id=message_id,
-                movie_id=movie_id)
-            return
-
-        # extra For Button in Channels
-        if sender_type != 'user':
-            callback_data = ':_:'.join([
-                'download',
-                str('id'),
-                str('message_id'),
-                str('sender_id')])
-
-            post_status = await bot.send_message(
-                chat_id=sender_id,
-                reply_to_message_id=message.message_id,
-                text=f'Choose one of these options. \nExit in seconds: {config.CALLBACK_WAIT_TIMEOUT}',
-                reply_markup=InlineKeyboardMarkup(
-                    inline_keyboard=[
-                        [InlineKeyboardButton(text='📣 Just Download️', callback_data=callback_data), ], ], ))
-
-            # Wait timeout pushing button Just Download
-            await asyncio.sleep(contextbot.get('callback_button_timeout_seconds'))
-
-            # After timeout clear key from storage if button pressed. Otherwies
-            # todo refactor
-            if callback_data in storage_callback_keys:
-                del storage_callback_keys[callback_data]
-            else:
-                await post_status.delete()
-            return
-
-
-async def autodownload_work(bot: Bot, message: Message):
-    hash_salted = get_hash_salted(message.sender_chat.id)
-    if check_chat_id_in_dict(message.sender_chat.id):
-        del autodownload_chat_ids_hashed[hash_salted]
-        await message.reply(f'Remove from Dict: {hash_salted}')
-    else:
-        autodownload_chat_ids_hashed[hash_salted] = None
-        await message.reply(f'Add to Dict: {hash_salted}')
-
-
-async def make_subtitles(bot: Bot, sender_id, url: str, word: str = ''):
+async def make_subtitles(bot: Bot, sender_id, url: str, word: str = '', info_message_id: int | None = None):
     text = await get_subtitles_here(url, word)
 
     text = '🔦 Nothing Found! 😉' if word else 'No subtitles! 😉' if not text else text
     caption = f"📝 Subtitles{f': 🔎 Search word:[{word}]' if word else ''}"
 
     if len(f'{caption}\n\n{text}') <= config.TELEGRAM_MAX_MESSAGE_TEXT_SIZE:
-        await bot.send_message(
+        await bot.edit_message_text(
             chat_id=sender_id,
+            message_id=info_message_id,
             text=f'{caption}\n\n{text}',
             parse_mode='HTML',
             disable_web_page_preview=False)
     else:
-        text = (text.replace('<b><s><b><s>', ' 🔹 ')
-                .replace(f'{word}</s></b></s></b>', f'{word.upper()}')
-                .replace('  ', ' '))
+        text = highlight_words_file_text(text, word)
         await bot.send_document(
             chat_id=sender_id,
             caption=caption,
             parse_mode='HTML',
-            document=BufferedInputFile(filename='subtitles.txt', file=text.encode('utf-8'), ))
+            document=BufferedInputFile(
+                filename='subtitles.txt',
+                file=text.encode('utf-8')))
+        await bot.delete_message(chat_id=sender_id, message_id=info_message_id)
 

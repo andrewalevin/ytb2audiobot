@@ -273,16 +273,16 @@ def get_data_dir():
     temp_dir = pathlib.Path(tempfile.gettempdir())
 
     if temp_dir.exists():
-        data_dir = temp_dir.joinpath(f'{config.DIRNAME_IN_TEMPDIR}-{_hash}')
+        data_dir = temp_dir.joinpath(f'{config.DATA_DIR_DIRNAME_IN_TEMPDIR}-{_hash}')
         data_dir.mkdir(parents=True, exist_ok=True)
 
-        symlink = pathlib.Path(config.DIRNAME_DATA)
+        symlink = pathlib.Path(config.DATA_DIR_NAME)
         if not symlink.exists():
             symlink.symlink_to(data_dir)
 
         return symlink
     else:
-        data_dir = pathlib.Path(config.DIRNAME_DATA)
+        data_dir = pathlib.Path(config.DATA_DIR_NAME)
         if data_dir.is_symlink():
             try:
                 data_dir.unlink()
@@ -301,3 +301,7 @@ def round_to_10(number):
 def predict_downloading_time(duration):
     time = int(0.04 * duration + 10)
     return round_to_10(time)
+
+
+def trim_caption_to_telegram_send(text):
+    return text[:config.TG_CAPTION_MAX_LONG - 32] + config.CAPTION_TRIMMED_END_TEXT

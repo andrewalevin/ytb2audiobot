@@ -6,7 +6,7 @@ from ytb2audio.ytb2audio import YT_DLP_OPTIONS_DEFAULT
 # main
 DEV = True
 
-CALLBACK_WAIT_TIMEOUT = 8
+CALLBACK_WAIT_TIMEOUT_SECONDS = 8
 
 KEEP_FILE_TIME_MINUTES_MIN = 5
 
@@ -146,18 +146,12 @@ YOUTUBE_DOMAINS = ['youtube.com', 'youtu.be']
 
 PARAMS_MAX_COUNT = 2
 
-# datadir
-
-DIRNAME_IN_TEMPDIR = 'pip-ytb2audiobot-data'
-DIRNAME_DATA = 'data'
-
-# subtitles
+DATA_DIR_DIRNAME_IN_TEMPDIR = 'pip-ytb2audiobot-data'
+DATA_DIR_NAME = 'data'
 
 FORMAT_TEMPLATE = Template('<b><s>$text</s></b>')
 ADDITION_ROWS_NUMBER = 1
 IS_TEXT_FORMATTED = True
-
-# timecodes
 
 MOVIES_TEST_TIMCODES = '''
 Как миграция убивает францию
@@ -190,6 +184,17 @@ PACKAGE_NAME = 'ytb2audiobot'
 YOUTUBE_URL = Template('youtu.be/$movieid')
 TIMEOUT_DOWNLOAD_PROCESSING_MULTIPLIRE_BY_PREDICT_TIME = 1
 
+CALLBACK_DATA_CHARS_SEPARATOR = ':_:'
+CALLBACK_SLEEP_TIME_SECONDS = 8
+
+TEXT_STARTED_HEAD = '🚀 Bot has started!'
+
+HELP_COMMANDS_TEXT = '''
+/extra - Extra options
+/help - Help'
+/autodownload - !Works only in channels
+'''
+
 
 def get_thumbnail_path(data_dir, movie_id):
     return pathlib.Path(data_dir).joinpath(f'{movie_id}-thumbnail.jpg')
@@ -197,3 +202,7 @@ def get_thumbnail_path(data_dir, movie_id):
 
 def get_audio_path(data_dir, movie_id):
     return pathlib.Path(data_dir).joinpath(f'{movie_id}.m4a')
+
+
+
+

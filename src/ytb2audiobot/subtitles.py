@@ -3,6 +3,10 @@ from ytb2subtitles.ytb2subtitles import get_subtitles
 from ytb2audiobot import config
 
 
+def highlight_words_file_text(text: str, word: str) -> str:
+    return text.replace('<b><s><b><s>', ' 🔹 ').replace(f'{word}</s></b></s></b>', f'{word.upper()}').replace('  ', ' ')
+
+
 def get_answer_text(subtitles, selected_index=None):
     if selected_index is None:
         selected_index = []

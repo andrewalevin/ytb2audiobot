@@ -14,10 +14,12 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
 from ytb2audiobot import config
+from ytb2audiobot.autodownload_chat_manager import AutodownloadChatManager
+from ytb2audiobot.callback_storage_manager import StorageCallbackManager
 from ytb2audiobot.cron import run_periodically, empty_dir_by_cron
-from ytb2audiobot.hardworkbot import direct_message_and_post_work, autodownload_work, job_downloading, make_subtitles
+from ytb2audiobot.hardworkbot import job_downloading, make_subtitles
 from ytb2audiobot.logger import logger
-from ytb2audiobot.utils import remove_all_in_dir, green_text, bold_text, get_data_dir
+from ytb2audiobot.utils import remove_all_in_dir, green_text, bold_text, get_data_dir, get_big_youtube_move_id
 from ytb2audiobot.cron import update_pip_package_ytdlp
 
 
@@ -28,18 +30,10 @@ router = Router()
 
 data_dir = get_data_dir()
 
-storage_callback_keys = dict()
+# Example usage
+callback_storage_manager = StorageCallbackManager()
 
-
-@dp.message(CommandStart())
-@dp.message(Command('help'))
-async def command_start_handler(message: Message) -> None:
-    await message.answer(text=config.START_COMMAND_TEXT, parse_mode='HTML')
-
-
-@dp.message(Command('version'))
-async def autodownload_handler(message: Message) -> None:
-    await message.reply(f"🟢 {config.PACKAGE_NAME} version: {version(config.PACKAGE_NAME)}")
+autodownload_chat_manager = AutodownloadChatManager(data_dir=data_dir)
 
 
 class StateFormMenuExtra(StatesGroup):
@@ -54,24 +48,49 @@ class StateFormMenuExtra(StatesGroup):
 ADVANCED_OPTIONS_TEXT = '''
 🎬 Advanced options can help you to:
     
-    •	✂️ Split audio into parts of a desired length
-    •	🎷 Bitrate adjustment for audio
-    •	📝 Subtitles download and word search
+    -	✂️ Split audio into parts of a desired length
+    -	🎷 Bitrate adjustment for audio
+    -	📝 Subtitles download and word search
     
 🔗 Send me your link to YouTube\'s video ... 
 '''
 
+TG_EXTRA_OPTIONS_LIST = ['extra', 'options', 'advanced']
 
-@dp.message(
-    Command(commands=['extra', 'options', 'advanced']),
-    StateFilter(default_state))
+
+@dp.message(CommandStart())
+@dp.message(Command('help'))
+async def handler_command_start_and_help(message: Message) -> None:
+    logger.debug('💈 handler_command_start_and_help(): ')
+    await message.answer(text=config.START_COMMAND_TEXT, parse_mode='HTML')
+
+
+@dp.message(Command('version'))
+async def handler_version_bot(message: Message) -> None:
+    logger.debug('💈 handler_version_bot(): ')
+
+    await message.reply(f"🟢 {config.PACKAGE_NAME} version: {version(config.PACKAGE_NAME)}")
+
+
+@dp.message(Command(commands=TG_EXTRA_OPTIONS_LIST), StateFilter(default_state))
 async def case_url_set(message: Message, state: FSMContext) -> None:
+    logger.debug('💈 case_url_set(): ')
+
     await message.answer(text=ADVANCED_OPTIONS_TEXT)
     await state.set_state(StateFormMenuExtra.url)
 
 
+@dp.channel_post(Command(commands=TG_EXTRA_OPTIONS_LIST))
+async def handler_extra_options_except_channel_post(message: Message) -> None:
+    logger.debug('💈 handler_extra_options_except_channel_post(): ')
+
+    await message.answer('❌ This command works only in bot not in channels.')
+
+
 @dp.message(StateFormMenuExtra.url)
 async def case_show_options(message: types.Message, state: FSMContext):
+    logger.debug('💈 case_show_options(): ')
+
     url = message.text
     # todo
 
@@ -114,6 +133,8 @@ keyboard_subtitles = InlineKeyboardMarkup(inline_keyboard=[[
 
 @dp.callback_query(StateFormMenuExtra.options)
 async def case_options(callback_query: types.CallbackQuery, state: FSMContext):
+    logger.debug('💈 case_options(): ')
+
     action = callback_query.data
 
     if action == 'split':
@@ -143,6 +164,8 @@ async def case_options(callback_query: types.CallbackQuery, state: FSMContext):
 
 @dp.callback_query(StateFormMenuExtra.split)
 async def case_split_processing(callback_query: types.CallbackQuery, state: FSMContext):
+    logger.debug('💈 case_split_processing(): ')
+
     duration = callback_query.data
     data = await state.get_data()
     url = data.get('url')
@@ -158,6 +181,8 @@ async def case_split_processing(callback_query: types.CallbackQuery, state: FSMC
 
 @dp.callback_query(StateFormMenuExtra.bitrate)
 async def case_bitrate_processing(callback_query: types.CallbackQuery, state: FSMContext):
+    logger.debug('💈 case_bitrate_processing(): ')
+
     bitrate = callback_query.data
     data = await state.get_data()
     url = data.get('url')
@@ -173,13 +198,17 @@ async def case_bitrate_processing(callback_query: types.CallbackQuery, state: FS
 
 @dp.callback_query(StateFormMenuExtra.subtitles_options)
 async def case_subtitle_options_processing(callback_query: types.CallbackQuery, state: FSMContext):
+    logger.debug('💈 case_subtitle_options_processing(): ')
+
     action = callback_query.data
     data = await state.get_data()
     url = data.get('url')
 
     if action == 'download':
         await state.clear()
-        await make_subtitles(bot=bot, sender_id=callback_query.from_user.id, url=url)
+
+        info_message = await callback_query.message.edit_text(text='⏳ Downloading subtitles ... ')
+        await make_subtitles(bot=bot, sender_id=callback_query.from_user.id, url=url, info_message_id=info_message.message_id)
     elif action == 'search':
         await bot.edit_message_text(
             chat_id=callback_query.from_user.id,
@@ -192,46 +221,94 @@ async def case_subtitle_options_processing(callback_query: types.CallbackQuery, 
 
 @dp.message(StateFormMenuExtra.subtitles_search)
 async def case_subtitles_search(message: types.Message, state: FSMContext):
+    logger.debug('💈 case_subtitles_search(): ')
+
     word = message.text
     data = await state.get_data()
     url = data.get('url')
 
     await state.clear()
-    await make_subtitles(bot=bot, sender_id=message.from_user.id, url=url, word=word)
+    info_message = await message.answer(text='⏳ Downloading subtitles and search word inside ... ')
+
+    await make_subtitles(bot=bot, sender_id=message.from_user.id, url=url, word=word, info_message_id=info_message.message_id)
 
 
 @dp.channel_post(Command('autodownload'))
-async def autodownload_handler(message: Message) -> None:
-    await autodownload_work(bot=bot, message=message)
+async def handler_autodownload_switch_state(message: types.Message) -> None:
+    logger.debug('💈 handler_autodownload_switch_state(): ')
+
+    if autodownload_chat_manager.toggle_chat_state(message.sender_chat.id):
+        await message.answer('💾 Added Chat ID to autodownloads.\n\nCall /autodownload again to remove.')
+    else:
+        await message.answer('♻️🗑 Removed Chat ID to autodownloads.\n\nCall /autodownload again to add.')
+
+
+@dp.message(Command('autodownload'))
+async def handler_autodownload_command_in_bot(message: types.Message) -> None:
+    logger.debug('💈 handler_autodownload_command_in_bot():')
+
+    await message.answer('❌ This command works only in Channels. Add this bot to the list of admins and call it call then')
 
 
 @dp.callback_query(lambda c: c.data.startswith('download:'))
 async def process_callback_button(callback_query: types.CallbackQuery):
+    logger.debug('💈 process_callback_button(): ')
+
     await bot.answer_callback_query(callback_query.id)
 
-    storage_callback_keys[callback_query.data] = ''
+    # Remove this key from list of callbacks
+    callback_storage_manager.remove_key(key=callback_query.data)
 
-    parts = callback_query.data.split(':_:')
+    callback_parts = callback_query.data.split(':_:')
+    sender_id = int(callback_parts[1])
+    message_id = int(callback_parts[2])
+    movie_id = callback_parts[3]
 
-    sender_id = int(parts[3])
-    message_id = int(parts[2])
-    movie_id = parts[1]
     info_message_id = callback_query.message.message_id
 
     await job_downloading(
         bot=bot,
         sender_id=sender_id,
         message_id=message_id,
-        movie_id=movie_id,
+        message_text=f'youtu.be/{movie_id}',
         info_message_id=info_message_id)
 
 
 @dp.message()
-@dp.channel_post()
-async def direct_message_and_post_handler(message: Message):
-    logger.debug('💈 Handler. direct_message_and_post_handler(): ')
+async def handler_message(message: Message):
+    logger.debug('💈 handler_message(): ')
 
-    await direct_message_and_post_work(bot, message)
+    await job_downloading(bot, message.from_user.id, message.message_id, message.text)
+
+
+@dp.channel_post()
+async def handler_channel_post(message: Message):
+    logger.debug('💈 handler_channel_post(): ')
+
+    if autodownload_chat_manager.is_chat_id_inside(message.sender_chat.id):
+        await job_downloading(bot, message.sender_chat.id, message.message_id, message.text)
+        return
+
+    if not (movie_id := get_big_youtube_move_id(message.text)):
+        return
+
+    callback_data = config.CALLBACK_DATA_CHARS_SEPARATOR.join([
+        'download',
+        str(message.sender_chat.id),
+        str(message.message_id),
+        str(movie_id)])
+
+    info_message = await message.reply(
+        text=f'Choose one of these options. \nExit in seconds: {config.CALLBACK_WAIT_TIMEOUT_SECONDS}',
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[[InlineKeyboardButton(text='📣 Just Download️', callback_data=callback_data)]]))
+
+    callback_storage_manager.add_key(key=callback_data)
+
+    await asyncio.sleep(config.CALLBACK_WAIT_TIMEOUT_SECONDS)
+
+    if callback_storage_manager.check_key_inside(key=callback_data):
+        await info_message.delete()
 
 
 async def run_bot_asynchronously():
@@ -241,37 +318,17 @@ async def run_bot_asynchronously():
     if True or os.getenv('DEBUG', 'false') == 'true':
         await bot.send_message(
             chat_id=config.OWNER_SENDER_ID,
-            text=f'🚀 Bot has started! \n\nversion: {version(config.PACKAGE_NAME)} \n\n'
-                 f'Commands:\n/extra - Extra options\n/help - Help')
+            text=f'🚀 Bot has started! \n\n📦 Package Version: {version(config.PACKAGE_NAME)} \n\n{config.HELP_COMMANDS_TEXT}')
 
     if os.environ.get('KEEP_DATA_FILES', 'false') != 'true':
         logger.info('♻️🗑 Remove last files in DATA')
         remove_all_in_dir(data_dir)
 
-    if False:
-        pass
-        # if config.AUTODOWNLOAD_CHAT_IDS_HASHED_PATH.exists():
-        #    with config.AUTODOWNLOAD_CHAT_IDS_HASHED_PATH.resolve().open('r') as file:
-        #        data = file.read()
-        #
-        #   global autodownload_file_hash
-        #    autodownload_file_hash = get_hash(data)
-        #
-        #    autodownload_chat_ids_hashed = {row: None for row in data.split('\n')}
-        #   logger.debug(f'🧮 Hashed Dict Init:  {autodownload_chat_ids_hashed} "', )
-        #
-
-    # run_periodically(
-    #             10, periodically_autodownload_chat_ids_save,
-    #             {
-    #                 'dict': autodownload_chat_ids_hashed,
-    #                 'file_hash': 'HASH',
-    #             }),
-
     await asyncio.gather(
         run_periodically(30, empty_dir_by_cron, {'age': 3600}),
         run_periodically(43200, update_pip_package_ytdlp, {}),
         dp.start_polling(bot),
+        # run_periodically(600, autodownload_chat_manager.save_hashed_chat_ids, {}),
     )
 
 

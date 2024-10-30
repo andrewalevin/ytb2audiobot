@@ -68,18 +68,14 @@ async def download_thumbnail(movie_id: str, thumbnail_path: pathlib.Path):
     return thumbnail_path
 
 
-async def audio_download(
-        movie_id: str,
-        audio_path: pathlib.Path,
-        ytdlprewriteoptions: str
-):
+async def audio_download(movie_id: str, audio_path: pathlib.Path):
     if audio_path.exists():
         return audio_path
 
     audio_result_path = await download_audio(
         movie_id=movie_id,
         data_dir=audio_path.parent,
-        ytdlprewriteoptions=ytdlprewriteoptions)
+        ytdlprewriteoptions=config.YT_DLP_OPTIONS_DEFAULT)
     if not audio_result_path or not audio_result_path.exists():
         return None
 
@@ -89,16 +85,14 @@ async def audio_download(
 async def download_processing(
         movie_id: str,
         data_dir: pathlib.Path,
-        duration: int,
-        ytdlprewriteoptions: str,
-):
+        duration: int):
     logger.debug(f'🐿 download_processing():')
 
     audio_path = config.get_audio_path(data_dir, movie_id)
     thumbnail_path = config.get_thumbnail_path(data_dir, movie_id)
 
     results = await asyncio.gather(
-        audio_download(movie_id=movie_id, audio_path=audio_path, ytdlprewriteoptions=ytdlprewriteoptions),
+        audio_download(movie_id=movie_id, audio_path=audio_path),
         download_thumbnail(movie_id=movie_id, thumbnail_path=thumbnail_path),
         return_exceptions=False
     )
