@@ -312,7 +312,7 @@ async def run_bot_asynchronously():
         run_periodically(30, empty_dir_by_cron, {'age': 3600}),
         run_periodically(43200, update_pip_package_ytdlp, {}),
         dp.start_polling(bot),
-        # run_periodically(600, autodownload_chat_manager.save_hashed_chat_ids, {}),
+        run_periodically(600, autodownload_chat_manager.save_hashed_chat_ids, {}),
     )
 
 

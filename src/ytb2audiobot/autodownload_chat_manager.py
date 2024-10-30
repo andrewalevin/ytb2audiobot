@@ -61,13 +61,13 @@ class AutodownloadChatManager:
             self.add_chat_id(chat_id)
             return True
 
-    def save_hashed_chat_ids(self, params=None) -> None:
-        """Save hashed_chat_ids to a file."""
-        with open(self.storage_file, 'wb') as f:
-            pickle.dump(self.hashed_chat_ids, f)
-
     def restore_hashed_chat_ids(self) -> None:
         """Restore hashed_chat_ids from a file if it exists."""
         if self.storage_file.exists():
             with open(self.storage_file, 'rb') as f:
                 self.hashed_chat_ids = pickle.load(f)
+
+    async def save_hashed_chat_ids(self, params=None) -> None:
+        """Save hashed_chat_ids to a file."""
+        with open(self.storage_file, 'wb') as f:
+            pickle.dump(self.hashed_chat_ids, f)
