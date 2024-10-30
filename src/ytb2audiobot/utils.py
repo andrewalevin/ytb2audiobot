@@ -7,6 +7,7 @@ import pathlib
 import datetime
 import aiofiles
 import aiofiles.os
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from urlextract import URLExtract
 import tempfile
 import zlib
@@ -305,3 +306,10 @@ def predict_downloading_time(duration):
 
 def trim_caption_to_telegram_send(text):
     return text[:config.TG_CAPTION_MAX_LONG - 32] + config.CAPTION_TRIMMED_END_TEXT
+
+
+def create_inline_keyboard(rows):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=str(number), callback_data=str(number)) for number in row]
+        for row in rows
+    ])

@@ -19,7 +19,8 @@ from ytb2audiobot.callback_storage_manager import StorageCallbackManager
 from ytb2audiobot.cron import run_periodically, empty_dir_by_cron
 from ytb2audiobot.hardworkbot import job_downloading, make_subtitles
 from ytb2audiobot.logger import logger
-from ytb2audiobot.utils import remove_all_in_dir, green_text, bold_text, get_data_dir, get_big_youtube_move_id
+from ytb2audiobot.utils import remove_all_in_dir, green_text, bold_text, get_data_dir, get_big_youtube_move_id, \
+    create_inline_keyboard
 from ytb2audiobot.cron import update_pip_package_ytdlp
 
 
@@ -106,31 +107,6 @@ async def case_show_options(message: types.Message, state: FSMContext):
             [InlineKeyboardButton(text='📝 Get subtitles', callback_data='subtitles')]]))
 
 
-prime_numbers_row1 = [2, 3, 5, 7, 11, 13, 17, 19]
-prime_numbers_row2 = [23, 29, 31, 37, 41, 43]
-prime_numbers_row3 = [47, 53, 59, 61, 67, ]
-prime_numbers_row4 = [73, 79, 83, 89]
-
-keyboard_split_duration = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text=str(number), callback_data=str(number)) for number in prime_numbers_row1],
-    [InlineKeyboardButton(text=str(number), callback_data=str(number)) for number in prime_numbers_row2],
-    [InlineKeyboardButton(text=str(number), callback_data=str(number)) for number in prime_numbers_row3],
-    [InlineKeyboardButton(text=str(number), callback_data=str(number)) for number in prime_numbers_row4]])
-
-keyboard_bitrate_values = InlineKeyboardMarkup(inline_keyboard=[[
-    InlineKeyboardButton(text='48k', callback_data='48'),
-    InlineKeyboardButton(text='64k', callback_data='64'),
-    InlineKeyboardButton(text='96k', callback_data='96'),
-    InlineKeyboardButton(text='128k', callback_data='128')], [
-    InlineKeyboardButton(text='196k', callback_data='196'),
-    InlineKeyboardButton(text='256k', callback_data='256'),
-    InlineKeyboardButton(text='320k', callback_data='320')]])
-
-keyboard_subtitles = InlineKeyboardMarkup(inline_keyboard=[[
-    InlineKeyboardButton(text='🍱 All subtitles', callback_data='download'),
-    InlineKeyboardButton(text='🍝 Search word inside', callback_data='search')]])
-
-
 @dp.callback_query(StateFormMenuExtra.options)
 async def case_options(callback_query: types.CallbackQuery, state: FSMContext):
     logger.debug('💈 case_options(): ')
@@ -142,7 +118,11 @@ async def case_options(callback_query: types.CallbackQuery, state: FSMContext):
             chat_id=callback_query.from_user.id,
             message_id=callback_query.message.message_id,
             text="✂️ Select duration split parts (in minutes): ",
-            reply_markup=keyboard_split_duration)
+            reply_markup=create_inline_keyboard([
+                [2, 3, 5, 7, 11, 13, 17, 19],
+                [23, 29, 31, 37, 41, 43],
+                [47, 53, 59, 61, 67],
+                [73, 79, 83, 89]]))
         await state.set_state(StateFormMenuExtra.split)
 
     elif action == 'bitrate':
@@ -150,7 +130,9 @@ async def case_options(callback_query: types.CallbackQuery, state: FSMContext):
             chat_id=callback_query.from_user.id,
             message_id=callback_query.message.message_id,
             text="🎷 Select preferable bitrate (in kbps): ",
-            reply_markup=keyboard_bitrate_values)
+            reply_markup=create_inline_keyboard([
+                ['48k', '64k', '96k', '128k'],
+                ['196k', '256k', '320k']]))
         await state.set_state(StateFormMenuExtra.bitrate)
 
     elif action == 'subtitles':
@@ -158,7 +140,9 @@ async def case_options(callback_query: types.CallbackQuery, state: FSMContext):
             chat_id=callback_query.from_user.id,
             message_id=callback_query.message.message_id,
             text="📝 Subtitles option: ",
-            reply_markup=keyboard_subtitles)
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(text='🍱 All subtitles', callback_data='download'),
+                InlineKeyboardButton(text='🍝 Search word inside', callback_data='search')]]))
         await state.set_state(StateFormMenuExtra.subtitles_options)
 
 
