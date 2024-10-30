@@ -103,10 +103,10 @@ async def download_processing(
 
     scheme = get_split_audio_scheme(
         source_audio_length=duration,
-        duration_seconds=60*18,
+        duration_seconds=60 * 39,
         delta_seconds=config.AUDIO_SPLIT_DELTA_SECONDS,
         magic_tail=True,
-        threshold_seconds=60*18
+        threshold_seconds=60 * 101
     )
     if len(scheme) == 1:
         size = await get_file_size(audio)
