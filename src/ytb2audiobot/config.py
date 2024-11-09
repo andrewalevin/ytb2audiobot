@@ -215,6 +215,8 @@ ACTION_NAME_SUBTITLES_SEARCH_WORD = 'subtitles_search_word'
 ACTION_NAME_SUBTITLES_GET_ALL = 'subtitles_get_all'
 ACTION_NAME_SUBTITLES_SHOW_OPTIONS = 'subtitles_show_options'
 ACTION_NAME_MUSIC = 'music_high_bitrate'
+ACTION_NAME_SLICE = 'slice'
+ACTION_NAME_OPTIONS_EXIT = 'options_exit'
 
 ENV_NAME_TOKEN = 'TG_TOKEN'
 ENV_NAME_SALT = 'HASH_SALT'
@@ -274,4 +276,7 @@ SEGMENTS_PADDING_SEC = 6
 TEXT_SAY_HELLO_BOT_OWNER_AT_STARTUP = Template(
     '🚀 Bot has started! \n\n📦 Package Version: ${package_bot_version}\n${help_commands_text}')
 
+LOG_FORMAT_CALLED_FUNCTION = Template('💈💈 ${fname}():')
 
+
+CAPTION_SLICE = Template('🍰 Slice from ${start_time} to ${end_time}')

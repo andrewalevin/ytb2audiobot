@@ -163,6 +163,16 @@ async def job_downloading(
             bitrate = new_bitrate
         yt_dlp_options = get_yt_dlp_options({'audio-quality': bitrate})
 
+    if action == config.ACTION_NAME_SLICE:
+        start_time = str(options.get('slice_start_time'))
+        end_time = str(options.get('slice_end_time'))
+
+        start_time_hhmmss = standardize_time_format(timedelta_from_seconds(start_time))
+        end_time_hhmmss = standardize_time_format(timedelta_from_seconds(end_time))
+
+        yt_dlp_options += f' --postprocessor-args \"-ss {start_time_hhmmss} -t {end_time_hhmmss}\"'
+        print(f'🍰 Slice yt_dlp_options = {yt_dlp_options}')
+
     audio_filename = config.AUDIO_FILENAME_TEMPLATE.substitute(
         movie_id=movie_id,
         bitrate=f'-{bitrate}',
@@ -259,10 +269,19 @@ async def job_downloading(
         title=capital2lower(title),
         author=capital2lower(author))
 
-    await info_message.edit_text('⌛🚀️ Uploading to Telegram ... ')
+    additional_caption_text = ''
 
-    print(f'🌈 Before Uploading Segments:: {segments}')
-    print()
+    if action == config.ACTION_NAME_SLICE:
+        start_time = str(options.get('slice_start_time'))
+        end_time = str(options.get('slice_end_time'))
+
+        start_time_hhmmss = standardize_time_format(timedelta_from_seconds(start_time))
+        end_time_hhmmss = standardize_time_format(timedelta_from_seconds(end_time))
+
+        additional_caption_text += f'\n\n{config.CAPTION_SLICE.substitute(
+            start_time=start_time_hhmmss, end_time=end_time_hhmmss)}'
+
+    await info_message.edit_text('⌛🚀️ Uploading to Telegram ... ')
 
     for idx, segment in enumerate(segments):
         logger.info(f'💚 Uploading audio item: ' + str(segment.get('audio_path')))
@@ -272,9 +291,8 @@ async def job_downloading(
             timecodes=timecodes_dict, start_time=start + config.SEGMENTS_PADDING_SEC, end_time=end - config.SEGMENTS_PADDING_SEC -1)
         timecodes_text = get_timecodes_formatted_text_from_dict(filtered_timecodes_dict, start)
 
-        additional = ''
         if segment.get('title'):
-            additional = config.ADDITIONAL_CHAPTER_BLOCK.substitute(
+            additional_caption_text += config.ADDITIONAL_CHAPTER_BLOCK.substitute(
                 time_shift=standardize_time_format(timedelta_from_seconds(segment.get('start'))),
                 title=segment.get('title'))
             timecodes_text = ''
@@ -284,7 +302,7 @@ async def job_downloading(
             partition='' if len(segments) == 1 else f'[Part {idx + 1} of {len(segments)}]',
             duration=standardize_time_format(timedelta_from_seconds(segment_duration)),
             timecodes=timecodes_text,
-            additional=additional)
+            additional=additional_caption_text)
 
         audio_filename_for_telegram = f'{title}-{audio_filename}'
         _filename = audio_filename_for_telegram if len(segments) == 1 else f'p{idx + 1}_of{len(segments)} {audio_filename_for_telegram}'

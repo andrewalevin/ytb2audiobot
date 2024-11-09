@@ -1,3 +1,4 @@
+import inspect
 import logging
 import os
 import argparse
@@ -19,6 +20,7 @@ from ytb2audiobot.callback_storage_manager import StorageCallbackManager
 from ytb2audiobot.cron import run_periodically, empty_dir_by_cron
 from ytb2audiobot.hardworkbot import job_downloading, make_subtitles
 from ytb2audiobot.logger import logger
+from ytb2audiobot.slice import time_hhmmss_check_and_convert
 from ytb2audiobot.utils import remove_all_in_dir, get_data_dir, get_big_youtube_move_id, create_inline_keyboard
 from ytb2audiobot.cron import update_pip_package_ytdlp
 
@@ -43,6 +45,8 @@ class StateFormMenuExtra(StatesGroup):
     bitrate = State()
     subtitles_options = State()
     subtitles_search_word = State()
+    slice_start_time = State()
+    slice_end_time = State()
     url = State()
 
 
@@ -82,6 +86,8 @@ TEXT_EXTRA_OPTIONS = '''<b>🔮 Advanced options:</b>
     - 🎸 Set audio Bitrate
 
     - ✏️ Get subtitles
+    
+    - 🍰️ Get slice of audio
 
 Select one of the []
 '''
@@ -103,7 +109,10 @@ async def case_show_options(message: types.Message, state: FSMContext):
                 InlineKeyboardButton(text='🚦️ By timecodes', callback_data=config.ACTION_NAME_SPLIT_BY_TIMECODES)],
             [
                 InlineKeyboardButton(text='🎸 Set bitrate', callback_data=config.ACTION_NAME_BITRATE_CHANGE),
-                InlineKeyboardButton(text='✏️ Get subtitles', callback_data=config.ACTION_NAME_SUBTITLES_SHOW_OPTIONS)]]))
+                InlineKeyboardButton(text='✏️ Get subtitles', callback_data=config.ACTION_NAME_SUBTITLES_SHOW_OPTIONS)],
+            [
+                InlineKeyboardButton(text='🍰 Get slice', callback_data=config.ACTION_NAME_SLICE),
+                InlineKeyboardButton(text='🔚 Exit', callback_data=config.ACTION_NAME_OPTIONS_EXIT)]]))
 
 BITRATE_VALUES_ROW_ONE = ['48k', '64k', '96k', '128k']
 BITRATE_VALUES_ROW_TWO = ['196k', '256k', '320k']
@@ -119,7 +128,7 @@ SPLIT_DURATION_VALUES_ALL = SPLIT_DURATION_VALUES_ROW_1 + SPLIT_DURATION_VALUES_
 
 @dp.callback_query(StateFormMenuExtra.options)
 async def case_options(callback_query: types.CallbackQuery, state: FSMContext):
-    logger.debug('💈 case_options(): ')
+    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
 
     action = callback_query.data
     if action == config.ACTION_NAME_SPLIT_BY_DURATION:
@@ -164,6 +173,15 @@ async def case_options(callback_query: types.CallbackQuery, state: FSMContext):
                 InlineKeyboardButton(text='🔮 Retrieve All', callback_data=config.ACTION_NAME_SUBTITLES_GET_ALL),
                 InlineKeyboardButton(text='🔍 Search by word', callback_data=config.ACTION_NAME_SUBTITLES_SEARCH_WORD)]]))
         await state.set_state(StateFormMenuExtra.subtitles_options)
+
+    elif action == config.ACTION_NAME_SLICE:
+        await state.update_data(action=action)
+        await bot.edit_message_text(
+            chat_id=callback_query.from_user.id,
+            message_id=callback_query.message.message_id,
+            text="🍰 Step 1/2. Give me a START time of your slice.\n "
+                 "In format 01:02:03. (hh:mm:ss) or 02:02 (mm:ss) or 78 seconds")
+        await state.set_state(StateFormMenuExtra.slice_start_time)
 
 
 @dp.callback_query(StateFormMenuExtra.split_by_duration)
@@ -230,6 +248,43 @@ async def case_subtitles_search_word(message: types.Message, state: FSMContext):
     await state.set_state(StateFormMenuExtra.url)
 
 
+@dp.message(StateFormMenuExtra.slice_start_time)
+async def case_slice_start_time(message: types.Message, state: FSMContext):
+    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
+
+    start_time = message.text
+    start_time = time_hhmmss_check_and_convert(start_time)
+    if start_time is None:
+        await state.clear()
+        await message.answer(text=f'❌ Not valid time format. Try again')
+
+    await state.update_data(slice_start_time=start_time)
+    await message.answer(text=f'🍰 Step 2/2. Now give me an END time  of your slice. \n'
+                              f'In format 01:02:03. (hh:mm:ss) or 02:02 (mm:ss) 78 seconds')
+    await state.set_state(StateFormMenuExtra.slice_end_time)
+
+
+@dp.message(StateFormMenuExtra.slice_end_time)
+async def case_slice_start_time(message: types.Message, state: FSMContext):
+    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
+
+    end_time = message.text
+    end_time = time_hhmmss_check_and_convert(end_time)
+    if end_time is None:
+        await state.clear()
+        await message.answer(text=f'❌ Not valid time format. Try again')
+
+    data = await state.get_data()
+    start_time = int(data.get('slice_start_time', ''))
+    if start_time >= end_time:
+        await state.clear()
+        await message.answer(text=f'❌ Start time should be less then end time. Try again')
+
+    await state.update_data(slice_end_time=end_time)
+    await message.answer(text=SEND_YOUTUBE_LINK_TEXT)
+    await state.set_state(StateFormMenuExtra.url)
+
+
 @dp.message(StateFormMenuExtra.url)
 async def case_url(message: Message, state: FSMContext) -> None:
     logger.debug('💈 case_url(): ')
@@ -271,6 +326,15 @@ async def case_url(message: Message, state: FSMContext) -> None:
         await job_downloading(
             bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id, message_text=url,
             info_message_id=None, options={'action': action, 'bitrate': bitrate})
+
+    elif action == config.ACTION_NAME_SLICE:
+        slice_start_time = data.get('slice_start_time', '')
+        slice_end_time = data.get('slice_end_time', '')
+
+        await job_downloading(
+            bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id, message_text=url,
+            info_message_id=None, options={
+                'action': action, 'slice_start_time': slice_start_time, 'slice_end_time': slice_end_time})
 
 
 @dp.channel_post(Command('autodownload'))
