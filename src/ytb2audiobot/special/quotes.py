@@ -25,7 +25,7 @@ async def get_subtitles(movie_id):
 
 
 def time_to_seconds(time_str):
-    hours, minutes, seconds = map(int, time_str.split(':'))
+    hours, minutes, seconds = map(int, time_str.split_by_duration(':'))
     return hours * 3600 + minutes * 60 + seconds
 
 

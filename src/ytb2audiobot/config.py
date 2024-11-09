@@ -56,7 +56,7 @@ $author $additional
 $timecodes
 ''')
 
-CAPTION_TRIMMED_END_TEXT = '…\n…\n⚔️ [chunked due to max telegram caption length]'
+CAPTION_TRIMMED_END_TEXT = '…\n…\n⚔️ [Text truncated to fit Telegram’s caption limit]'
 
 ADDITIONAL_INFO_FORCED_SPLITTED = '\n\n🎏 [forced splitted due to max orig file size]'
 
@@ -78,7 +78,7 @@ DEFAULT_MOVIE_META = {
 }
 
 
-TELEGRAM_MAX_AUDIO_BOT_FILE_SIZE_BYTES_BINARY = 3300000
+MAX_FILE_SIZE_UPLOADING_TELEGRAM_BOT_BYTES = 3300000
 
 
 COMMANDS_SPLIT = [
@@ -177,8 +177,6 @@ DEFAULT_TELEGRAM_TOKEN_IMAGINARY = '123456789:AAE_O0RiWZRJOeOB8Nn8JWia_uUTqa2bXG
 
 # Function to set the environment variable
 
-OWNER_SENDER_ID = '4583603'
-
 PACKAGE_NAME = 'ytb2audiobot'
 
 YOUTUBE_URL = Template('youtu.be/$movieid')
@@ -190,9 +188,9 @@ CALLBACK_SLEEP_TIME_SECONDS = 8
 TEXT_STARTED_HEAD = '🚀 Bot has started!'
 
 HELP_COMMANDS_TEXT = '''
-/extra - Extra options
-/help - Help'
-/autodownload - !Works only in channels
+/extra - 🔮Extra options
+/help - 🤔 Help'
+/autodownload - 🏂‍ (Works only in channels)
 '''
 
 
@@ -204,5 +202,76 @@ def get_audio_path(data_dir, movie_id):
     return pathlib.Path(data_dir).joinpath(f'{movie_id}.m4a')
 
 
+BITRATE_AUDIO_FILENAME_FORMAT_TEMPLATE = Template('-bitrate${bitrate}')
+AUDIO_FILENAME_TEMPLATE = Template('${movie_id}${bitrate}${extension}')
+THUMBNAIL_FILENAME_TEMPLATE = Template('${movie_id}-thumbnail${extension}')
+
+BITRATES_VALUES = ['48k', '64k', '96k', '128k'] + ['196k', '256k', '320k']
+
+ACTION_NAME_BITRATE_CHANGE = 'bitrate_change'
+ACTION_NAME_SPLIT_BY_TIMECODES = 'split_by_timecodes'
+ACTION_NAME_SPLIT_BY_DURATION = 'split_by_duration'
+ACTION_NAME_SUBTITLES_SEARCH_WORD = 'subtitles_search_word'
+ACTION_NAME_SUBTITLES_GET_ALL = 'subtitles_get_all'
+ACTION_NAME_SUBTITLES_SHOW_OPTIONS = 'subtitles_show_options'
+ACTION_NAME_MUSIC = 'music_high_bitrate'
+
+ENV_NAME_TOKEN = 'TG_TOKEN'
+ENV_NAME_SALT = 'HASH_SALT'
+ENV_NAME_DEBUG_MODE = 'YTB2AUDIO_DEBUG_MODE'
+ENV_NAME_KEEP_DATA_FILES = 'KEEP_DATA_FILES'
+ENV_TG_BOT_OWNER_ID = 'TG_BOT_OWNER_ID'
+
+YT_DLP_OPTIONS_DEFAULT = {
+    'extract-audio': True,
+    'audio-format': 'm4a',
+    'audio-quality': '48k',
+    'embed-thumbnail': True,
+    'console-title': True,
+    'embed-metadata': True,
+    'newline': True,
+    'progress-delta': '2',
+    'break-on-existing': True
+}
+
+
+def get_yt_dlp_options(override_options=None):
+    if override_options is None:
+        override_options = {}
+
+    options = YT_DLP_OPTIONS_DEFAULT
+
+    options.update(override_options)
+
+    rows = []
+
+    for key, value in options.items():
+        if isinstance(value, bool):
+            if value:
+                rows.append(f'--{key}')
+            else:
+                continue
+        else:
+            rows.append(f'--{key} {value}')
+
+    return ' '.join(rows)
+
+
+# 255 max - minus additionals
+MAX_TELEGRAM_FILENAME_LENGTH = 64
+
+CLI_ACTIVATION_SUBTITLES = ['subtitles', 'subs', 'sub']
+CLI_ACTIVATION_MUSIC = ['music', 'mu', 'mu', 'm', 'song', 's']
+CLI_ACTIVATION_ALL = CLI_ACTIVATION_SUBTITLES + CLI_ACTIVATION_MUSIC
+
+ACTION_MUSIC_HIGH_BITRATE = BITRATES_VALUES[-1]
+
+ADDITIONAL_CHAPTER_BLOCK = Template('\n\n📌 <b>$title</b>\n[Chapter +${time_shift}]')
+
+SEGMENTS_PADDING_SEC = 6
+
+
+TEXT_SAY_HELLO_BOT_OWNER_AT_STARTUP = Template(
+    '🚀 Bot has started! \n\n📦 Package Version: ${package_bot_version}\n${help_commands_text}')
 
 

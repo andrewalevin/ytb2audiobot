@@ -1,8 +1,8 @@
-import asyncio
-import math
 import pathlib
 
-from audio2splitted.audio2splitted import get_split_audio_scheme, make_split_audio
+from audio2splitted.audio2splitted import get_split_audio_scheme, make_split_audio, get_audio_segments_by_timecodes, \
+    time_format
+from audio2splitted.utils import run_cmds
 from ytb2audio.ytb2audio import download_audio
 from ytbtimecodes.timecodes import standardize_time_format, timedelta_from_seconds
 
@@ -29,7 +29,26 @@ def get_timecodes_formatted_text(timecodes):
     return '\n'.join(formatted_timecodes)
 
 
-async def download_thumbnail(movie_id: str, thumbnail_path: pathlib.Path):
+def get_timecodes_formatted_text_from_dict(timecodes_dict, start_time: int = 0):
+    # Return an empty string if there are no timecodes
+    if not timecodes_dict:
+        return ''
+
+    formatted_timecodes = []
+    for time, value in timecodes_dict.items():
+        # Extract time and title from the current stamp
+        if time - start_time > 0:
+            time = time - start_time
+        _time = standardize_time_format(timedelta_from_seconds(time))
+        title = capital2lower(value.get('title'))
+
+        formatted_timecodes.append(f"{_time} - {title}")
+
+    # Join the list into a single string with each timecode on a new line
+    return '\n'.join(formatted_timecodes)
+
+
+async def download_thumbnail(movie_id: str, thumbnail_path: pathlib.Path) -> pathlib.Path | None:
     """
     Downloads a thumbnail for the given movie ID using yt-dlp and saves it as a JPEG image.
 
@@ -42,6 +61,8 @@ async def download_thumbnail(movie_id: str, thumbnail_path: pathlib.Path):
     """
     if thumbnail_path.exists():
         return thumbnail_path
+
+    # todo add age update
 
     command = f'yt-dlp --write-thumbnail --skip-download --convert-thumbnails jpg -o {thumbnail_path.with_suffix('')} {movie_id}'
 
@@ -68,77 +89,84 @@ async def download_thumbnail(movie_id: str, thumbnail_path: pathlib.Path):
     return thumbnail_path
 
 
-async def audio_download(movie_id: str, audio_path: pathlib.Path):
+async def audio_download(movie_id: str, audio_path: pathlib.Path) -> pathlib.Path | None:
     if audio_path.exists():
         return audio_path
 
-    audio_result_path = await download_audio(
-        movie_id=movie_id,
-        data_dir=audio_path.parent,
-        ytdlprewriteoptions=config.YT_DLP_OPTIONS_DEFAULT)
-    if not audio_result_path or not audio_result_path.exists():
-        return None
+    # audio_result_path = await
 
-    return audio_result_path
+    return audio_path
 
 
-async def download_processing(
-        movie_id: str,
-        data_dir: pathlib.Path,
-        duration: int):
-    logger.debug(f'🐿 download_processing():')
+async def make_split_audio_second(audio_path: pathlib.Path, segments: list) -> list:
+    if segments is None:
+        segments = []
 
-    audio_path = config.get_audio_path(data_dir, movie_id)
-    thumbnail_path = config.get_thumbnail_path(data_dir, movie_id)
+    if len(segments) == 1:
+        segments[0]['path'] = audio_path
+        return segments
 
-    results = await asyncio.gather(
-        audio_download(movie_id=movie_id, audio_path=audio_path),
-        download_thumbnail(movie_id=movie_id, thumbnail_path=thumbnail_path),
-        return_exceptions=False
-    )
+    cmds_list = []
+    for idx, segment in enumerate(segments):
+        segment_file = audio_path.with_stem(f'{audio_path.stem}-p{idx + 1}-of{len(segments)}')
+        print('💜', segment_file)
+        segments[idx]['path'] = segment_file
+        cmd = (
+            f'ffmpeg -i {audio_path.as_posix()} -ss {time_format(segment['start'])} -to {time_format(segment['end'])} -c copy -y {segment_file.as_posix()}')
+        print('💜💜', cmd, type(cmd))
+        cmds_list.append(cmd)
 
-    audio = results[0]
-    if not audio:
-        return []
+    print('💜 cmds_list: ', cmds_list)
+    print()
 
-    scheme = get_split_audio_scheme(
-        source_audio_length=duration,
-        duration_seconds=60 * 39,
-        delta_seconds=config.AUDIO_SPLIT_DELTA_SECONDS,
-        magic_tail=True,
-        threshold_seconds=60 * 101
-    )
-    if len(scheme) == 1:
-        size = await get_file_size(audio)
-        if size and size > config.TELEGRAM_BOT_FILE_MAX_SIZE_BYTES:
-            number_parts = math.ceil(size / config.TELEGRAM_BOT_FILE_MAX_SIZE_BYTES)
+    results, all_success = await run_cmds(cmds_list)
+    print('results, all_success', results, all_success)
+    print()
 
-            scheme = get_split_audio_scheme(
-                source_audio_length=duration,
-                duration_seconds=duration // number_parts,
-                delta_seconds=config.AUDIO_SPLIT_DELTA_SECONDS,
-                magic_tail=True,
-                threshold_seconds=1)
+    print("🟢 All Done! Lets see .m4a files and their length")
 
-    print(f'🌈 Scheme: {scheme}')
+    return segments
 
-    results = await asyncio.gather(
-        make_split_audio(
-            audio_path=audio,
-            audio_duration=duration,
-            output_folder=data_dir,
-            scheme=scheme))
-    audios = results[0]
 
-    logger.info(f'🍫 Audios: {audios}')
+def get_chapters(chapters_yt_info):
+    if not chapters_yt_info:
+        return {}
 
-    audio_items = []
-    for idx, item in enumerate(audios):
-        audio_items.append({
-            'audio_path': item['path'],
-            'duration': item['duration'],
-            'start': scheme[idx][0],
-            'end': scheme[idx][1]
-        })
+    chapters = dict()
+    for chapter in chapters_yt_info:
+        if not chapter.get('title', ''):
+            continue
 
-    return audio_items
+        if not chapter.get('start_time', ''):
+            continue
+
+        #   _end = chapter.get('end_time')
+
+        time = int(chapter.get('start_time'))
+
+        chapters[time] = {
+            'title': chapter.get('title'),
+            'type': 'chapter'}
+
+    return chapters
+
+
+def get_timecodes_dict(timecodes: list) -> dict:
+    if timecodes is None:
+        return {}
+
+    timecodes_dict = dict()
+    for timecode in timecodes:
+        time = timecode.get('time')
+        timecodes_dict[time] = {
+            'title': timecode.get('title'),
+            'type': 'timecode'}
+
+    return timecodes_dict
+
+
+def filter_timecodes_within_bounds_with_dict(timecodes: dict, start_time: int, end_time: int) -> dict:
+    """Filters timecodes that fall within the specified start and end times."""
+
+    filtered_dict = {k: v for k, v in timecodes.items() if start_time <= k <= end_time}
+    return filtered_dict

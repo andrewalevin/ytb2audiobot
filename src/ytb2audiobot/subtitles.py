@@ -61,14 +61,14 @@ def format_text(text, target):
 async def get_subtitles_here(url: str, discovered_word: str = ''):
     subtitles = get_subtitles(url)
     if not subtitles:
-        return
+        return ''
 
     if not discovered_word:
         text = get_answer_text(subtitles)
         return text
 
     if not (discovered_index := get_discovered_subtitles_index(subtitles, discovered_word)):
-        return
+        return ''
 
     discovered_index = extend_discovered_index(discovered_index, len(subtitles), config.ADDITION_ROWS_NUMBER)
 

@@ -233,11 +233,7 @@ def bold_text(text):
 
 
 def is_youtube_url(text):
-
-    for domain in config.YOUTUBE_DOMAINS:
-        if domain in text:
-            return True
-    return False
+    return any(domain in text for domain in config.YOUTUBE_DOMAINS)
 
 
 def get_big_youtube_move_id(text):
@@ -313,3 +309,20 @@ def create_inline_keyboard(rows):
         [InlineKeyboardButton(text=str(number), callback_data=str(number)) for number in row]
         for row in rows
     ])
+
+
+def get_short_youtube_url(movie_id: str = ''):
+    return f'youtu.be/{movie_id}'
+
+
+def truncate_filename_for_telegram(filename: str) -> str:
+    parts = filename.split('.')
+    if len(parts) < 2:
+        return filename if len(filename) < config.MAX_TELEGRAM_FILENAME_LENGTH else filename[:config.MAX_TELEGRAM_FILENAME_LENGTH]
+
+    ext = '.' + parts[-1]
+    all = '.'.join(parts[:-1])
+    size = config.MAX_TELEGRAM_FILENAME_LENGTH
+    size -= len(ext)
+    all = all if len(all) < size else filename[:size]
+    return all + ext

@@ -1,45 +1,102 @@
 import asyncio
 import math
+import os
+import pathlib
 from string import Template
 
 import yt_dlp
 from aiogram import Bot
 from aiogram.types import FSInputFile, BufferedInputFile
-from ytbtimecodes.timecodes import extract_timecodes, timedelta_from_seconds, standardize_time_format, \
-    filter_timecodes_within_bounds
+from ytb2audio.ytb2audio import download_audio_by_audio_path
+from ytbtimecodes.timecodes import extract_timecodes, timedelta_from_seconds, standardize_time_format
 
-from ytb2audiobot import  config
-from ytb2audiobot.config import get_thumbnail_path
+from ytb2audiobot import config
+from ytb2audiobot.config import get_yt_dlp_options
+from ytb2audiobot.segmentation import segments_verification, get_segments_by_duration, \
+    add_paddings_to_segments, make_magic_tail, get_segments_by_timecodes_from_dict
 from ytb2audiobot.subtitles import get_subtitles_here, highlight_words_file_text
 from ytb2audiobot.logger import logger
-from ytb2audiobot.download import download_processing, get_timecodes_formatted_text
-from ytb2audiobot.utils import seconds2humanview, capital2lower, get_filename_m4a, \
-    predict_downloading_time, get_data_dir, get_big_youtube_move_id, trim_caption_to_telegram_send
+from ytb2audiobot.download import download_thumbnail, \
+    make_split_audio_second, get_chapters, get_timecodes_dict, filter_timecodes_within_bounds_with_dict, \
+    get_timecodes_formatted_text_from_dict
+from ytb2audiobot.utils import seconds2humanview, capital2lower, \
+    predict_downloading_time, get_data_dir, get_big_youtube_move_id, trim_caption_to_telegram_send, get_file_size, \
+    get_short_youtube_url, truncate_filename_for_telegram
+
+DEBUG = False if os.getenv(config.ENV_NAME_DEBUG_MODE, 'false').lower() != 'true' else True
+
+
+async def make_subtitles(
+        bot: Bot,
+        sender_id: int,
+        url: str = '',
+        word: str = '',
+        reply_message_id: int | None = None,
+        editable_message_id: int | None = None):
+    info_message = await bot.edit_message_text(
+        chat_id=sender_id,
+        message_id=editable_message_id,
+        text='⏳ Getting ready …'
+    ) if editable_message_id else await bot.send_message(
+        chat_id=sender_id,
+        reply_to_message_id=reply_message_id,
+        text='⏳ Getting ready …')
+
+    info_message = await info_message.edit_text(text='⏳ Fetching subtitles …')
+
+    if not (movie_id := get_big_youtube_move_id(url)):
+        await info_message.edit_text('🔴 Can t get valid youtube movie id out of your url')
+        return
+
+    print(f'🐸 WORD SEARCH - url={url}, word={word}')
+    text = await get_subtitles_here(url, word)
+    print('RESULT: ', text)
+    print()
+
+    caption = f'✏️ Subtitles\n\n{get_short_youtube_url(movie_id)}\n\n '
+
+    if word:
+        caption += f'🔎 Search word: {word}\n\n' if text else '🔦 Nothing Found! 😉\n\n'
+
+    if len(caption + text) < config.TELEGRAM_MAX_MESSAGE_TEXT_SIZE:
+        await bot.send_message(
+            chat_id=sender_id,
+            text=f'{caption}{text}',
+            parse_mode='HTML')
+        await info_message.delete()
+    else:
+        text = highlight_words_file_text(text, word)
+        await bot.send_document(
+            chat_id=sender_id,
+            caption=caption,
+            document=BufferedInputFile(
+                filename=f'subtitles-{movie_id}.txt',
+                file=text.encode('utf-8')))
+        await info_message.delete()
 
 
 async def job_downloading(
         bot: Bot,
         sender_id: int,
-        message_id: id,
-        message_text: str,
-        info_message_id: int = 0):
+        reply_to_message_id: int | None = None,
+        message_text: str = '',
+        info_message_id: int | None = None,
+        options=None):
+    if options is None:
+        options = {}
 
     movie_id = get_big_youtube_move_id(message_text)
     if not movie_id:
         return
 
     # Inverted logic refactor
-    info_message = await bot.send_message(
-        chat_id=sender_id,
-        reply_to_message_id=message_id,
-        text='⏳ Preparing ... '
-    ) if not info_message_id else await bot.edit_message_text(
+    info_message = await bot.edit_message_text(
         chat_id=sender_id,
         message_id=info_message_id,
-        text='⏳ Preparing ... '
-    )
-
-    # movie_meta = await get_movie_meta(movie_id)
+        text='⏳ Getting ready …'
+    ) if info_message_id else await bot.send_message(
+        chat_id=sender_id,
+        text='⏳ Getting ready …')
 
     ydl_opts = {
         'logtostderr': False,  # Avoids logging to stderr, logs to the logger instead
@@ -60,118 +117,193 @@ async def job_downloading(
             text='❌🎬💃 This movie video is now live and unavailable for download. Please try again later')
         return
 
-    if not any(format_item.get('filesize') is not None for format_item in yt_info.get('formats', [])):
-        await info_message.edit_text(text='❌🎬🤔 Audiо file for this video is unavailable for an unknown reason.')
-        return
-
     if not yt_info.get('title') or not yt_info.get('duration'):
         await info_message.edit_text(text='❌🎬💔 No title or duration info of this video.')
+        return
+
+    if not yt_info.get('filesize_approx', ''):
+        await info_message.edit_text(
+            text='❌🛰 This movie video is now live but perhapse in processes of changing. Try again later')
+        return
+
+    if not any(format_item.get('filesize') is not None for format_item in yt_info.get('formats', [])):
+        await info_message.edit_text(
+            text='❌🎬🤔 Audio file for this video is unavailable for an unknown reason.')
         return
 
     predict_time = predict_downloading_time(yt_info.get('duration'))
     info_message = await info_message.edit_text(text=f'⏳ Downloading ~ {seconds2humanview(predict_time)} ... ')
 
     data_dir = get_data_dir()
-    title = yt_info.get('title')
-    description = yt_info.get('description')
+    title = yt_info.get('title', '')
+    description = yt_info.get('description', '')
+    author = yt_info.get('uploader', '')
     duration = yt_info.get('duration')
-    author = yt_info.get('uploader')
+    timecodes = extract_timecodes(description)
+
+    timecodes_dict = get_timecodes_dict(timecodes)
+
+    chapters = get_chapters(yt_info.get('chapters', []))
+
+    timecodes_dict.update(chapters)
 
     # todo add depend on predict
-    try:
-        audio_items = await asyncio.wait_for(
-            asyncio.create_task(
-                download_processing(
-                    movie_id=movie_id,
-                    data_dir=data_dir,
-                    duration=duration)),
-            timeout=config.TASK_TIMEOUT_SECONDS)
-    except asyncio.TimeoutError:
-        await info_message.edit_text(text='🚫 Download processing timed out. Please try again later.')
-        return
-    except Exception as e:
-        logger.error(f'🚫 Error during download_processing(): {e}')
-        await info_message.edit_text(text=f'🚫 Error during download_processing(): \n\n{str(e)}')
-        return
 
-    if not audio_items:
+    thumbnail_path = config.get_thumbnail_path(data_dir, movie_id)
+
+    action = options.get('action', '')
+
+    yt_dlp_options = get_yt_dlp_options()
+
+    bitrate = '48k'
+
+    if action == config.ACTION_NAME_BITRATE_CHANGE:
+        new_bitrate = options.get('bitrate', '')
+        if new_bitrate in config.BITRATES_VALUES:
+            bitrate = new_bitrate
+        yt_dlp_options = get_yt_dlp_options({'audio-quality': bitrate})
+
+    audio_filename = config.AUDIO_FILENAME_TEMPLATE.substitute(
+        movie_id=movie_id,
+        bitrate=f'-{bitrate}',
+        extension='.m4a')
+    audio_path = data_dir.joinpath(audio_filename)
+    thumbnail_filename = config.THUMBNAIL_FILENAME_TEMPLATE.substitute(
+        movie_id=movie_id,
+        extension='.jpg')
+
+    # Run tasks with timeout
+    async def handle_download():
+        try:
+            result = await asyncio.wait_for(
+                timeout=config.TASK_TIMEOUT_SECONDS,
+                fut=asyncio.gather(
+                    asyncio.create_task(
+                        download_audio_by_audio_path(
+                            audio_path=audio_path, movie_id=movie_id, ytdlprewriteoptions=yt_dlp_options)),
+                    asyncio.create_task(
+                        download_thumbnail(
+                            movie_id=movie_id, thumbnail_path=data_dir.joinpath(thumbnail_filename)))))
+            return result
+        except asyncio.TimeoutError:
+            await info_message.edit_text(text='🚫 Download processing timed out. Please try again later.')
+            return None, None
+        except Exception as e:
+            logger.error(f'🚫 Error during download_processing(): {e}')
+            await info_message.edit_text(text=f'🚫 Error during download_processing(): \n\n{str(e)}')
+            return None, None
+
+    audio, thumbnail = await handle_download()
+    if not audio:
+        return []
+    audio, thumbnail = pathlib.Path(audio), pathlib.Path(thumbnail)
+    if not audio.exists():
+        return []
+
+    segments = [{'path': audio, 'start': 0, 'end': duration, 'title': ''}]
+
+    _THRESHOLD_SPLIT_MIN = 101
+    _SEGMENT_DURATION = 39
+
+    if action == config.ACTION_NAME_SPLIT_BY_DURATION:
+        split_duration_minutes = int(options.get('split_duration_minutes', 0))
+        if split_duration_minutes > 0:
+            segments = get_segments_by_duration(
+                total_duration=duration,
+                segment_duration=60 * split_duration_minutes)
+
+    elif action == config.ACTION_NAME_SPLIT_BY_TIMECODES:
+        # segments = get_segments_by_timecodes(timecodes=timecodes, total_duration=duration)
+        segments = get_segments_by_timecodes_from_dict(timecodes=timecodes_dict, total_duration=duration)
+
+    elif duration > 60 * _THRESHOLD_SPLIT_MIN:
+        segments = get_segments_by_duration(
+            total_duration=duration,
+            segment_duration=60 * _SEGMENT_DURATION)
+
+    print(f'🌈 Segments:: {segments}')
+    print()
+
+    segments = add_paddings_to_segments(segments, config.SEGMENTS_PADDING_SEC)
+    print(f'🌈 After Padding Segments:: {segments}')
+    print()
+
+    audio_file_size = await get_file_size(audio)
+
+    max_segment_duration = int(0.89 * duration * config.TELEGRAM_BOT_FILE_MAX_SIZE_BYTES / audio_file_size)
+
+    segments = make_magic_tail(segments, max_segment_duration)
+
+    segments = segments_verification(segments, max_segment_duration)
+
+    print('🌈🌈 segments_audio After Verification: ', segments)
+
+    if not segments:
         await info_message.edit_text(text='💔 Nothing to send you after downloading. Sorry :(')
         return
 
-    thumbnail_path = get_thumbnail_path(data_dir, movie_id)
     try:
-        timecodes = extract_timecodes(description)
+        segments = await make_split_audio_second(audio_path, segments)
     except Exception as e:
-        timecodes = []
+        print('Error:', e)
+        # logger.error(f'💔 Error with Audio Split \n\n{e}')
+        # await info_message.edit_text(text=f'💔 Error with Audio Split \n\n{e}')
+        return
 
-    filename = get_filename_m4a(title)
+    if not segments:
+        await info_message.edit_text(text='💔 Nothing to send you after audio split. Sorry :(')
+        return
+
     caption_head = config.CAPTION_HEAD_TEMPLATE.safe_substitute(
         movieid=movie_id,
         title=capital2lower(title),
-        author=capital2lower(author),
-    )
+        author=capital2lower(author))
 
     await info_message.edit_text('⌛🚀️ Uploading to Telegram ... ')
-    for idx, item in enumerate(audio_items):
-        logger.info(f'💚 Uploading audio item: ' + str(item.get('audio_path')))
 
-        boundaries_timecodes = filter_timecodes_within_bounds(timecodes, item.get('start'), item.get('end'))
-        print('boundaries_timecodes: ')
-        print(boundaries_timecodes)
-        print()
+    print(f'🌈 Before Uploading Segments:: {segments}')
+    print()
 
-        timecodes_text = get_timecodes_formatted_text(boundaries_timecodes)
+    for idx, segment in enumerate(segments):
+        logger.info(f'💚 Uploading audio item: ' + str(segment.get('audio_path')))
+        start = segment.get('start')
+        end = segment.get('end')
+        filtered_timecodes_dict = filter_timecodes_within_bounds_with_dict(
+            timecodes=timecodes_dict, start_time=start + config.SEGMENTS_PADDING_SEC, end_time=end - config.SEGMENTS_PADDING_SEC -1)
+        timecodes_text = get_timecodes_formatted_text_from_dict(filtered_timecodes_dict, start)
 
+        additional = ''
+        if segment.get('title'):
+            additional = config.ADDITIONAL_CHAPTER_BLOCK.substitute(
+                time_shift=standardize_time_format(timedelta_from_seconds(segment.get('start'))),
+                title=segment.get('title'))
+            timecodes_text = ''
+
+        segment_duration = end - start
         caption = Template(caption_head).safe_substitute(
-            partition='' if len(audio_items) == 1 else f'[Part {idx+1} of {len(audio_items)}]',
-            duration=standardize_time_format(timedelta_from_seconds(item.get('duration') + 1)),
+            partition='' if len(segments) == 1 else f'[Part {idx + 1} of {len(segments)}]',
+            duration=standardize_time_format(timedelta_from_seconds(segment_duration)),
             timecodes=timecodes_text,
-            additional=''
-        )
+            additional=additional)
+
+        audio_filename_for_telegram = f'{title}-{audio_filename}'
+        _filename = audio_filename_for_telegram if len(segments) == 1 else f'p{idx + 1}_of{len(segments)} {audio_filename_for_telegram}'
 
         await bot.send_audio(
             chat_id=sender_id,
-            reply_to_message_id=message_id,
             audio=FSInputFile(
-                path=item.get('audio_path'),
-                filename=filename if len(audio_items) == 1 else f'p{idx+1}_of{len(audio_items)} {filename}'),
-            duration=item.get('duration'),
+                path=segment.get('path'),
+                filename=truncate_filename_for_telegram(_filename)),
+            duration=segment_duration,
             thumbnail=FSInputFile(path=thumbnail_path) if thumbnail_path.exists() else None,
             caption=caption if len(caption) < config.TG_CAPTION_MAX_LONG else trim_caption_to_telegram_send(caption),
-            parse_mode='HTML'
-        )
+            parse_mode='HTML')
 
         # Sleep to avoid flood in Telegram API
-        if idx < len(audio_items) - 1:
-            sleep_duration = math.floor(8 * math.log10(len(audio_items) + 1))
+        if idx < len(segments) - 1:
+            sleep_duration = math.floor(8 * math.log10(len(segments) + 1))
             logger.debug(f'💤😴 Sleep sleep_duration={sleep_duration}')
             await asyncio.sleep(sleep_duration)
 
     await info_message.delete()
     logger.info(f'💚💚 Done! ')
-
-
-async def make_subtitles(bot: Bot, sender_id, url: str, word: str = '', info_message_id: int | None = None):
-    text = await get_subtitles_here(url, word)
-
-    text = '🔦 Nothing Found! 😉' if word else 'No subtitles! 😉' if not text else text
-    caption = f"📝 Subtitles{f': 🔎 Search word:[{word}]' if word else ''}"
-
-    if len(f'{caption}\n\n{text}') <= config.TELEGRAM_MAX_MESSAGE_TEXT_SIZE:
-        await bot.edit_message_text(
-            chat_id=sender_id,
-            message_id=info_message_id,
-            text=f'{caption}\n\n{text}',
-            parse_mode='HTML',
-            disable_web_page_preview=False)
-    else:
-        text = highlight_words_file_text(text, word)
-        await bot.send_document(
-            chat_id=sender_id,
-            caption=caption,
-            parse_mode='HTML',
-            document=BufferedInputFile(
-                filename='subtitles.txt',
-                file=text.encode('utf-8')))
-        await bot.delete_message(chat_id=sender_id, message_id=info_message_id)
-

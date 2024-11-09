@@ -2,5 +2,6 @@
 
 #pip install -e . && ytb2audiobot --mode DEV
 pip install -e . --no-deps
-ytb2audiobot --debug
-#ytb2audiobotrouter --debug
+
+export YTB2AUDIO_DEBUG_MODE="true"
+ytb2audiobot

@@ -43,7 +43,7 @@ classifiers = [
 
 dependencies = [
   'ytb2audio',
-  'audio2splitted==2.3',
+  'audio2splitted',
   'aiogram',
   'python-dotenv',
   'pytube',
