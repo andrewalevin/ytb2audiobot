@@ -280,3 +280,8 @@ LOG_FORMAT_CALLED_FUNCTION = Template('💈💈 ${fname}():')
 
 
 CAPTION_SLICE = Template('🍰 Slice from ${start_time} to ${end_time}')
+
+YT_DLP_OPTIONS_DEFAULT_2 = ('--extract-audio --audio-format m4a --audio-quality 48k'
+                          ' --embed-thumbnail --console-title --embed-metadata'
+                          ' --newline --progress-delta 2 --break-on-existing')
+

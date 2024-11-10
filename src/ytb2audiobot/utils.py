@@ -5,19 +5,51 @@ import pprint
 import re
 import pathlib
 import datetime
+from typing import Union
+
 import aiofiles
 import aiofiles.os
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from pytube.extract import video_id
 from urlextract import URLExtract
 import tempfile
 import zlib
 import hashlib
-from ytb2audio.ytb2audio import get_youtube_move_id
 
 from ytb2audiobot import config
-
+from ytb2audiobot.logger import logger
 
 CAPITAL_LETTERS_PERCENT_THRESHOLD = 0.3
+
+
+def timedelta_from_seconds(seconds: Union[str, int, float]) -> str:
+    """
+    Converts a number of seconds into a string representation of a timedelta object.
+
+    Args:
+        seconds (Union[str, int, float]): The number of seconds as a string, integer, or float.
+
+    Returns:
+        str: The formatted string representation of the timedelta.
+
+    Raises:
+        ValueError: If the input cannot be converted to an integer.
+    """
+    try:
+        # Convert to integer to ensure compatibility with timedelta
+        seconds_int = int(float(seconds))
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Invalid input for seconds: {seconds}") from e
+
+    time_delta = datetime.timedelta(seconds=seconds_int)
+    return str(time_delta)
+
+def get_youtube_move_id(url: str):
+    try:
+        movie_id = video_id(url)
+    except Exception as e:
+        return None
+    return movie_id
 
 
 async def create_directory_async(path):
@@ -186,7 +218,7 @@ async def check_autodownload_hashs(ids_dict):
     pass
 
 
-async def run_command(cmd):
+async def run_command_old(cmd):
     process = await asyncio.create_subprocess_shell(
         cmd,
         stdout=asyncio.subprocess.PIPE,
@@ -196,6 +228,41 @@ async def run_command(cmd):
     stdout, stderr = await process.communicate()
 
     return stdout.decode(), stderr.decode(), process.returncode
+
+
+async def run_command(cmd):
+    """Run a command asynchronously and log output in real-time."""
+    process = await asyncio.create_subprocess_shell(
+        cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+
+    # Read stdout and stderr line by line and log immediately
+    stdout_lines = []
+    stderr_lines = []
+
+    async def read_stream(stream, log_func, lines):
+        """Helper to read a stream line by line and log each line."""
+        while True:
+            line = await stream.readline()
+            if line:
+                decoded_line = line.decode().strip()
+                log_func(decoded_line)
+                lines.append(decoded_line)  # Store the line for final return
+            else:
+                break
+
+    # Use tasks to read stdout and stderr concurrently
+    await asyncio.gather(
+        read_stream(process.stdout, logger.debug, stdout_lines),
+        read_stream(process.stderr, logger.error, stderr_lines)
+    )
+
+    # Wait for the process to exit
+    return_code = await process.wait()
+
+    return "\n".join(stdout_lines), "\n".join(stderr_lines), return_code
 
 
 def remove_all_in_dir(data_dir: pathlib.Path):
@@ -313,6 +380,14 @@ def create_inline_keyboard(rows):
 
 def get_short_youtube_url(movie_id: str = ''):
     return f'youtu.be/{movie_id}'
+
+
+def get_short_youtube_url_with_http(movie_id: str = ''):
+    return f'https://youtu.be/{movie_id}'
+
+
+
+
 
 
 def truncate_filename_for_telegram(filename: str) -> str:

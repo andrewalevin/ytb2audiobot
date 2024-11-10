@@ -7,7 +7,6 @@ from string import Template
 import yt_dlp
 from aiogram import Bot
 from aiogram.types import FSInputFile, BufferedInputFile
-from ytb2audio.ytb2audio import download_audio_by_audio_path
 from ytbtimecodes.timecodes import extract_timecodes, timedelta_from_seconds, standardize_time_format
 
 from ytb2audiobot import config
@@ -16,12 +15,12 @@ from ytb2audiobot.segmentation import segments_verification, get_segments_by_dur
     add_paddings_to_segments, make_magic_tail, get_segments_by_timecodes_from_dict
 from ytb2audiobot.subtitles import get_subtitles_here, highlight_words_file_text
 from ytb2audiobot.logger import logger
-from ytb2audiobot.download import download_thumbnail, \
+from ytb2audiobot.download import download_thumbnail_from_download, \
     make_split_audio_second, get_chapters, get_timecodes_dict, filter_timecodes_within_bounds_with_dict, \
-    get_timecodes_formatted_text_from_dict
+    get_timecodes_formatted_text_from_dict, download_audio_from_download
 from ytb2audiobot.utils import seconds2humanview, capital2lower, \
     predict_downloading_time, get_data_dir, get_big_youtube_move_id, trim_caption_to_telegram_send, get_file_size, \
-    get_short_youtube_url, truncate_filename_for_telegram
+    truncate_filename_for_telegram, get_short_youtube_url
 
 DEBUG = False if os.getenv(config.ENV_NAME_DEBUG_MODE, 'false').lower() != 'true' else True
 
@@ -181,6 +180,7 @@ async def job_downloading(
     thumbnail_filename = config.THUMBNAIL_FILENAME_TEMPLATE.substitute(
         movie_id=movie_id,
         extension='.jpg')
+    thumbnail_path = audio_path.parent.joinpath(thumbnail_filename)
 
     # Run tasks with timeout
     async def handle_download():
@@ -189,11 +189,11 @@ async def job_downloading(
                 timeout=config.TASK_TIMEOUT_SECONDS,
                 fut=asyncio.gather(
                     asyncio.create_task(
-                        download_audio_by_audio_path(
-                            audio_path=audio_path, movie_id=movie_id, ytdlprewriteoptions=yt_dlp_options)),
+                        download_audio_from_download(
+                            movie_id=movie_id, output_path=audio_path, options=yt_dlp_options)),
                     asyncio.create_task(
-                        download_thumbnail(
-                            movie_id=movie_id, thumbnail_path=data_dir.joinpath(thumbnail_filename)))))
+                        download_thumbnail_from_download(
+                            movie_id=movie_id, output_path=thumbnail_path))))
             return result
         except asyncio.TimeoutError:
             await info_message.edit_text(text='🚫 Download processing timed out. Please try again later.')
@@ -203,14 +203,19 @@ async def job_downloading(
             await info_message.edit_text(text=f'🚫 Error during download_processing(): \n\n{str(e)}')
             return None, None
 
-    audio, thumbnail = await handle_download()
-    if not audio:
-        return []
-    audio, thumbnail = pathlib.Path(audio), pathlib.Path(thumbnail)
-    if not audio.exists():
+    audio_path, thumbnail_path = await handle_download()
+    if audio_path is None:
         return []
 
-    segments = [{'path': audio, 'start': 0, 'end': duration, 'title': ''}]
+    audio_path = pathlib.Path(audio_path)
+
+    if not audio_path.exists():
+        return []
+
+    if thumbnail_path is not None:
+        thumbnail_path = pathlib.Path(thumbnail_path)
+
+    segments = [{'path': audio_path, 'start': 0, 'end': duration, 'title': ''}]
 
     _THRESHOLD_SPLIT_MIN = 101
     _SEGMENT_DURATION = 39
@@ -223,7 +228,6 @@ async def job_downloading(
                 segment_duration=60 * split_duration_minutes)
 
     elif action == config.ACTION_NAME_SPLIT_BY_TIMECODES:
-        # segments = get_segments_by_timecodes(timecodes=timecodes, total_duration=duration)
         segments = get_segments_by_timecodes_from_dict(timecodes=timecodes_dict, total_duration=duration)
 
     elif duration > 60 * _THRESHOLD_SPLIT_MIN:
@@ -238,7 +242,7 @@ async def job_downloading(
     print(f'🌈 After Padding Segments:: {segments}')
     print()
 
-    audio_file_size = await get_file_size(audio)
+    audio_file_size = await get_file_size(audio_path)
 
     max_segment_duration = int(0.89 * duration * config.TELEGRAM_BOT_FILE_MAX_SIZE_BYTES / audio_file_size)
 
@@ -313,7 +317,7 @@ async def job_downloading(
                 path=segment.get('path'),
                 filename=truncate_filename_for_telegram(_filename)),
             duration=segment_duration,
-            thumbnail=FSInputFile(path=thumbnail_path) if thumbnail_path.exists() else None,
+            thumbnail=FSInputFile(path=thumbnail_path) if thumbnail_path is not None else None,
             caption=caption if len(caption) < config.TG_CAPTION_MAX_LONG else trim_caption_to_telegram_send(caption),
             parse_mode='HTML')
 

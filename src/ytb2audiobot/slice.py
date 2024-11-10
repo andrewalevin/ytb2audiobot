@@ -40,4 +40,3 @@ def time_hhmmss_check_and_convert(start_time: str) -> Optional[int]:
 
     # Calculate total seconds
     return hours * 3600 + minutes * 60 + seconds
-
