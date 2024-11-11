@@ -14,12 +14,12 @@ RUN pwd
 
 RUN ls -lha
 
-COPY docker-run.sh docker-run.sh
+COPY docker-run.sh /app/docker-run.sh
 
 RUN echo "🟢🔵🟣 After COPY"
 
 RUN ls -lha
 
-CMD ["docker-run-bot.sh"]
+CMD ["/app/docker-run-bot.sh"]
 
 
