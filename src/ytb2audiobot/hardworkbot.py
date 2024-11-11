@@ -84,6 +84,8 @@ async def job_downloading(
     if options is None:
         options = {}
 
+    logger.debug(f'💹 Options: {options}')
+
     movie_id = get_big_youtube_move_id(message_text)
     if not movie_id:
         return
@@ -154,6 +156,9 @@ async def job_downloading(
 
     yt_dlp_options = get_yt_dlp_options()
 
+    logger.debug(f'🈺 action = {action}\n\n')
+    logger.debug(f'🈴 yt_dlp_options = {yt_dlp_options}\n\n')
+
     bitrate = '48k'
 
     if action == config.ACTION_NAME_BITRATE_CHANGE:
@@ -181,6 +186,8 @@ async def job_downloading(
         movie_id=movie_id,
         extension='.jpg')
     thumbnail_path = audio_path.parent.joinpath(thumbnail_filename)
+
+    logger.debug(f'🈴🈴 yt_dlp_options = {yt_dlp_options}\n\n')
 
     # Run tasks with timeout
     async def handle_download():

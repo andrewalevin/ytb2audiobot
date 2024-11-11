@@ -42,51 +42,32 @@ def get_timecodes_formatted_text(timecodes_dict: Dict[int, Dict], start_time: in
     return '\n'.join(formatted_timecodes)
 
 
-async def make_split_audio_second(audio_path: pathlib.Path, segments: List[Dict]) -> List[Dict]:
-    """
-    Splits an audio file into multiple segments using ffmpeg and updates the segment paths.
+async def make_split_audio_second(audio_path: pathlib.Path, segments: list) -> list:
+    if segments is None:
+        segments = []
 
-    Args:
-        audio_path (pathlib.Path): The path to the input audio file.
-        segments (List[Dict[str, str]]): A list of dictionaries with 'start' and 'end' keys to define the segments.
-
-    Returns:
-        List[Dict[str, pathlib.Path]]: A list of segment dictionaries with updated 'path' keys for each split audio file.
-    """
-    if not segments:
-        return []
+    if len(segments) == 1:
+        segments[0]['path'] = audio_path
+        return segments
 
     cmds_list = []
-
     for idx, segment in enumerate(segments):
-        # Ensure 'start' and 'end' are present in the segment dictionary
-        start = segment.get('start')
-        end = segment.get('end')
-
-        if start is None or end is None:
-            raise ValueError(f"💕 Missing 'start' or 'end' in segment {idx + 1}")
-
-        # Generate output file path for the segment
-        segment_file = audio_path.with_stem(f'{audio_path.stem}-p{idx + 1}-of{len(segments)}.m4a')
-        segment['path'] = segment_file
-
-        # Build the ffmpeg command for splitting the audio
+        segment_file = audio_path.with_stem(f'{audio_path.stem}-p{idx + 1}-of{len(segments)}')
+        print('💜', segment_file)
+        segments[idx]['path'] = segment_file
         cmd = (
-            f'ffmpeg -i {audio_path.as_posix()} -ss {time_format(start)} -to {time_format(end)} '
-            f'-c copy -y {segment_file.as_posix()}'
-        )
+            f'ffmpeg -i {audio_path.as_posix()} -ss {time_format(segment['start'])} -to {time_format(segment['end'])} -c copy -y {segment_file.as_posix()}')
+        print('💜💜', cmd, type(cmd))
         cmds_list.append(cmd)
 
-    # Log the commands (for debugging purposes)
-    logger.debug(f"💕 Generated {len(cmds_list)} ffmpeg commands: {cmds_list}")
+    print('💜 cmds_list: ', cmds_list)
+    print()
 
-    # Execute the commands asynchronously
     results, all_success = await run_cmds(cmds_list)
+    print('results, all_success', results, all_success)
+    print()
 
-    if all_success:
-        logger.info("💕 🟢 All audio segments processed successfully!")
-    else:
-        logger.error(f"💕 🔴 Some audio segments failed. Results: {results}")
+    print("🟢 All Done! Lets see .m4a files and their length")
 
     return segments
 
@@ -149,35 +130,9 @@ def get_timecodes_dict(timecodes: Optional[List]) -> Dict:
     return timecodes_dict
 
 
-def filter_timecodes_within_bounds(timecodes: Dict[int, str], start_time: int, end_time: int) -> Dict[int, str]:
-    """
-    Filters timecodes that fall within the specified start and end times.
+def filter_timecodes_within_bounds(timecodes: dict, start_time: int, end_time: int) -> dict:
+    """Filters timecodes that fall within the specified start and end times."""
 
-    Parameters:
-        timecodes (dict): A dictionary where keys are integer timestamps and values are timecode labels.
-        start_time (int): The lower bound (inclusive) for filtering timecodes.
-        end_time (int): The upper bound (inclusive) for filtering timecodes.
-
-    Returns:
-        dict: A dictionary containing timecodes within the specified range.
-
-    Raises:
-        ValueError: If start_time is greater than end_time.
-        TypeError: If timecodes is not a dictionary or if start_time/end_time are not integers.
-    """
-    # Validate input types
-    if not isinstance(timecodes, dict):
-        raise TypeError("timecodes must be a dictionary with integer keys and string values.")
-    if not all(isinstance(k, int) and isinstance(v, str) for k, v in timecodes.items()):
-        raise TypeError("All keys in timecodes must be integers and values must be strings.")
-    if not isinstance(start_time, int) or not isinstance(end_time, int):
-        raise TypeError("start_time and end_time must be integers.")
-
-    # Validate time range
-    if start_time > end_time:
-        raise ValueError("start_time must be less than or equal to end_time.")
-
-    # Filter timecodes within bounds
     return {k: v for k, v in timecodes.items() if start_time <= k <= end_time}
 
 

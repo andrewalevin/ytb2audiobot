@@ -263,7 +263,7 @@ def get_yt_dlp_options(override_options=None):
 MAX_TELEGRAM_FILENAME_LENGTH = 64
 
 CLI_ACTIVATION_SUBTITLES = ['subtitles', 'subs', 'sub']
-CLI_ACTIVATION_MUSIC = ['music', 'mu', 'mu', 'm', 'song', 's']
+CLI_ACTIVATION_MUSIC = ['music', 'song']
 CLI_ACTIVATION_ALL = CLI_ACTIVATION_SUBTITLES + CLI_ACTIVATION_MUSIC
 
 ACTION_MUSIC_HIGH_BITRATE = BITRATES_VALUES[-1]

@@ -385,6 +385,10 @@ def cli_action_parser(text: str):
 
     matching_attr = next((attr for attr in config.CLI_ACTIVATION_ALL if attr in text), None)
 
+    logger.debug(f'🌀 cli_action_parser: 1 matching_attr={matching_attr}')
+    if matching_attr is None:
+        return action, attributes
+
     if matching_attr in config.CLI_ACTIVATION_SUBTITLES:
         action = config.ACTION_NAME_SUBTITLES_GET_ALL
 
@@ -397,6 +401,7 @@ def cli_action_parser(text: str):
                 action = config.ACTION_NAME_SUBTITLES_SEARCH_WORD
                 attributes['word'] = word
 
+    logger.debug(f'🌀 cli_action_parser: 4 matching_attr={matching_attr}')
     if matching_attr in config.CLI_ACTIVATION_MUSIC:
         action = config.ACTION_NAME_MUSIC
 
@@ -405,7 +410,7 @@ def cli_action_parser(text: str):
 
 @dp.message()
 async def handler_message(message: Message):
-    logger.debug('💈 handler_message(): ')
+    logger.debug('💈🏧  handler_message(): ')
 
     cli_action, cli_attributes = cli_action_parser(message.text)
 
@@ -429,6 +434,7 @@ async def handler_message(message: Message):
             options={'action': config.ACTION_NAME_BITRATE_CHANGE, 'bitrate': config.ACTION_MUSIC_HIGH_BITRATE})
         return
 
+    logger.debug('🈯 DIRECT MESSAGE: ')
     await job_downloading(
         bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id,
         message_text=message.text)
