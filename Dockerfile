@@ -16,7 +16,7 @@ RUN ls -lha
 
 COPY docker-run.sh docker-run.sh
 
-RUN "🟢🔵🟣 After COPY"
+RUN echo "🟢🔵🟣 After COPY"
 
 RUN ls -lha
 
