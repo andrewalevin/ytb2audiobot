@@ -183,6 +183,9 @@ async def case_options(callback_query: types.CallbackQuery, state: FSMContext):
                  "In format 01:02:03. (hh:mm:ss) or 02:02 (mm:ss) or 78 seconds")
         await state.set_state(StateFormMenuExtra.slice_start_time)
 
+    elif action == config.ACTION_NAME_OPTIONS_EXIT:
+        await state.clear()
+
 
 @dp.callback_query(StateFormMenuExtra.split_by_duration)
 async def case_split_by_duration_processing(callback_query: types.CallbackQuery, state: FSMContext):

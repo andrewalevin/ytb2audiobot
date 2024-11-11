@@ -1,5 +1,3 @@
-MAX_FILESIZE = 3242880
-
 
 def segments_verification(segments: list, max_segment_duration: int) -> list:
     # Calculate maximum allowed duration for each segment based on source file size and total duration

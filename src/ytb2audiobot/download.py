@@ -10,37 +10,7 @@ from ytb2audiobot.logger import logger
 from ytb2audiobot.utils import run_command
 
 
-def get_timecodes_formatted_text(timecodes: List[Dict[str, int]]) -> str:
-    """
-    Formats a list of timecodes into a single string with each timecode on a new line.
-
-    Args:
-        timecodes (List[Dict[str, int]]): A list of dictionaries containing time (in seconds) and title for each timecode.
-
-    Returns:
-        str: Formatted timecodes as a string with each entry on a new line.
-    """
-    if not timecodes:
-        logger.info("No timecodes provided.")
-        return ''
-
-    formatted_timecodes = []
-    for stamp in timecodes:
-        try:
-            time = standardize_time_format(timedelta_from_seconds(stamp['time']))
-            title = capital2lower(stamp['title'])
-            formatted_timecodes.append(f"{time} - {title}")
-        except KeyError as e:
-            logger.error(f"Missing key in timecode entry: {e}")
-            continue
-        except Exception as e:
-            logger.error(f"Error formatting timecode: {e}")
-            continue
-
-    return '\n'.join(formatted_timecodes)
-
-
-def get_timecodes_formatted_text_from_dict(timecodes_dict: Dict[int, Dict], start_time: int = 0) -> str:
+def get_timecodes_formatted_text(timecodes_dict: Dict[int, Dict], start_time: int = 0) -> str:
     """
     Formats a dictionary of timecodes into a string with each timecode on a new line.
 
@@ -66,7 +36,7 @@ def get_timecodes_formatted_text_from_dict(timecodes_dict: Dict[int, Dict], star
             title = capital2lower(value.get('title', 'Untitled'))
             formatted_timecodes.append(f"{_time} - {title}")
         except Exception as e:
-            logger.error(f"Error processing timecode at {time}: {e}")
+            logger.error(f"🔴 Error processing timecode at {time}: {e}")
             continue
 
     return '\n'.join(formatted_timecodes)
@@ -94,7 +64,7 @@ async def make_split_audio_second(audio_path: pathlib.Path, segments: List[Dict]
         end = segment.get('end')
 
         if start is None or end is None:
-            raise ValueError(f"Missing 'start' or 'end' in segment {idx + 1}")
+            raise ValueError(f"💕 Missing 'start' or 'end' in segment {idx + 1}")
 
         # Generate output file path for the segment
         segment_file = audio_path.with_stem(f'{audio_path.stem}-p{idx + 1}-of{len(segments)}.m4a')
@@ -108,15 +78,15 @@ async def make_split_audio_second(audio_path: pathlib.Path, segments: List[Dict]
         cmds_list.append(cmd)
 
     # Log the commands (for debugging purposes)
-    logger.debug(f"Generated {len(cmds_list)} ffmpeg commands: {cmds_list}")
+    logger.debug(f"💕 Generated {len(cmds_list)} ffmpeg commands: {cmds_list}")
 
     # Execute the commands asynchronously
     results, all_success = await run_cmds(cmds_list)
 
     if all_success:
-        logger.info("🟢 All audio segments processed successfully!")
+        logger.info("💕 🟢 All audio segments processed successfully!")
     else:
-        logger.error(f"🔴 Some audio segments failed. Results: {results}")
+        logger.error(f"💕 🔴 Some audio segments failed. Results: {results}")
 
     return segments
 
@@ -179,11 +149,36 @@ def get_timecodes_dict(timecodes: Optional[List]) -> Dict:
     return timecodes_dict
 
 
-def filter_timecodes_within_bounds_with_dict(timecodes: dict, start_time: int, end_time: int) -> dict:
-    """Filters timecodes that fall within the specified start and end times."""
+def filter_timecodes_within_bounds(timecodes: Dict[int, str], start_time: int, end_time: int) -> Dict[int, str]:
+    """
+    Filters timecodes that fall within the specified start and end times.
 
-    filtered_dict = {k: v for k, v in timecodes.items() if start_time <= k <= end_time}
-    return filtered_dict
+    Parameters:
+        timecodes (dict): A dictionary where keys are integer timestamps and values are timecode labels.
+        start_time (int): The lower bound (inclusive) for filtering timecodes.
+        end_time (int): The upper bound (inclusive) for filtering timecodes.
+
+    Returns:
+        dict: A dictionary containing timecodes within the specified range.
+
+    Raises:
+        ValueError: If start_time is greater than end_time.
+        TypeError: If timecodes is not a dictionary or if start_time/end_time are not integers.
+    """
+    # Validate input types
+    if not isinstance(timecodes, dict):
+        raise TypeError("timecodes must be a dictionary with integer keys and string values.")
+    if not all(isinstance(k, int) and isinstance(v, str) for k, v in timecodes.items()):
+        raise TypeError("All keys in timecodes must be integers and values must be strings.")
+    if not isinstance(start_time, int) or not isinstance(end_time, int):
+        raise TypeError("start_time and end_time must be integers.")
+
+    # Validate time range
+    if start_time > end_time:
+        raise ValueError("start_time must be less than or equal to end_time.")
+
+    # Filter timecodes within bounds
+    return {k: v for k, v in timecodes.items() if start_time <= k <= end_time}
 
 
 async def download_thumbnail_from_download(
@@ -202,7 +197,7 @@ async def download_thumbnail_from_download(
     """
     output_path = pathlib.Path(output_path)
     if output_path.exists():
-        logger.info(f"🟩 Thumbnail already exists at {output_path}")
+        logger.info(f"🌅 Thumbnail already exists at {output_path}")
         return output_path
 
     url = get_short_youtube_url_with_http(movie_id)
@@ -211,7 +206,7 @@ async def download_thumbnail_from_download(
         f'yt-dlp --write-thumbnail --skip-download --convert-thumbnails jpg '
         f'--output "{output_path.with_suffix('').as_posix()}" {url}')
 
-    logger.debug(f"🟩 Running thumbnail download command: {command}")
+    logger.debug(f"🌅🔰 Running thumbnail download command: {command}")
     stdout, stderr, return_code = await run_command(command)
 
     # Log output from command
@@ -224,14 +219,14 @@ async def download_thumbnail_from_download(
 
     # Error and file existence checks
     if return_code != 0:
-        logger.error(f"🟩 Thumbnail download failed for movie ID: {movie_id} with return code {return_code}")
+        logger.error(f"🌅 Thumbnail download failed for movie ID: {movie_id} with return code {return_code}")
         return None
 
     if not output_path.exists():
-        logger.error(f"🟩 Thumbnail file not found at {output_path.with_suffix('.jpg')}")
+        logger.error(f"🌅 Thumbnail file not found at {output_path.with_suffix('.jpg')}")
         return None
 
-    logger.info(f"Thumbnail successfully downloaded at {output_path.as_posix()}")
+    logger.info(f"🌅 Thumbnail successfully downloaded at {output_path.as_posix()}")
     return output_path
 
 
@@ -252,13 +247,13 @@ async def download_audio_from_download(
     """
     output_path = pathlib.Path(output_path)
     if output_path.exists():
-        logger.info(f"💙 Audio file already exists at {output_path}")
+        logger.info(f"📣 Audio file already exists at {output_path}")
         return output_path
 
     url = get_short_youtube_url_with_http(movie_id)
     command = f'yt-dlp {options} --output "{output_path.as_posix()}" {url}'
 
-    logger.debug(f"💙 Executing command: {command}")
+    logger.debug(f"📣🔰 Executing command: {command}")
 
     stdout, stderr, return_code = await run_command(command)
 
@@ -271,11 +266,11 @@ async def download_audio_from_download(
 
     # Check for errors or missing file
     if return_code != 0:
-        logger.error(f"Download failed with return code {return_code}")
+        logger.error(f"📣 Download failed with return code {return_code}")
         return None
     if not output_path.exists():
-        logger.error(f"Expected audio file not found at {output_path}")
+        logger.error(f"📣 Expected audio file not found at {output_path}")
         return None
 
-    logger.info(f"💙 Audio successfully downloaded to {output_path}")
+    logger.info(f"📣 Audio successfully downloaded to {output_path}")
     return output_path

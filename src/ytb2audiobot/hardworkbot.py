@@ -16,8 +16,8 @@ from ytb2audiobot.segmentation import segments_verification, get_segments_by_dur
 from ytb2audiobot.subtitles import get_subtitles_here, highlight_words_file_text
 from ytb2audiobot.logger import logger
 from ytb2audiobot.download import download_thumbnail_from_download, \
-    make_split_audio_second, get_chapters, get_timecodes_dict, filter_timecodes_within_bounds_with_dict, \
-    get_timecodes_formatted_text_from_dict, download_audio_from_download
+    make_split_audio_second, get_chapters, get_timecodes_dict, filter_timecodes_within_bounds, \
+    get_timecodes_formatted_text, download_audio_from_download
 from ytb2audiobot.utils import seconds2humanview, capital2lower, \
     predict_downloading_time, get_data_dir, get_big_youtube_move_id, trim_caption_to_telegram_send, get_file_size, \
     truncate_filename_for_telegram, get_short_youtube_url
@@ -291,9 +291,9 @@ async def job_downloading(
         logger.info(f'💚 Uploading audio item: ' + str(segment.get('audio_path')))
         start = segment.get('start')
         end = segment.get('end')
-        filtered_timecodes_dict = filter_timecodes_within_bounds_with_dict(
+        filtered_timecodes_dict = filter_timecodes_within_bounds(
             timecodes=timecodes_dict, start_time=start + config.SEGMENTS_PADDING_SEC, end_time=end - config.SEGMENTS_PADDING_SEC -1)
-        timecodes_text = get_timecodes_formatted_text_from_dict(filtered_timecodes_dict, start)
+        timecodes_text = get_timecodes_formatted_text(filtered_timecodes_dict, start)
 
         if segment.get('title'):
             additional_caption_text += config.ADDITIONAL_CHAPTER_BLOCK.substitute(
