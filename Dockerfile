@@ -10,16 +10,9 @@ ENV PYTHONUNBUFFERED=1
 
 RUN pip install --no-cache-dir --upgrade ytb2audiobot
 
-RUN pwd
+COPY docker-runner-bot.sh /app/docker-runner-bot.sh
 
-RUN ls -lha
+RUN chmod +x /app/docker-runner-bot.sh
 
-COPY docker-run.sh /app/docker-run.sh
-
-RUN echo "🟢🔵🟣 After COPY"
-
-RUN ls -lha
-
-CMD ["/app/docker-run-bot.sh"]
-
+CMD ["/usr/bin/bash", "/app/docker-runner-bot.sh"]
 
