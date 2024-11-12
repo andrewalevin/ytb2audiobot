@@ -16,3 +16,4 @@ RUN chmod +x /app/docker-runner-bot.sh
 
 CMD ["/usr/bin/bash", "/app/docker-runner-bot.sh"]
 
+
