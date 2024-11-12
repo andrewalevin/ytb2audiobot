@@ -25,3 +25,4 @@ else
     echo "[docker-runner-bot.sh] 📟 Silent mode is OFF. Running command with standart log output."
     ytb2audiobot
 fi
+
