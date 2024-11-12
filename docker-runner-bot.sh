@@ -1,31 +1,34 @@
 #!/bin/bash
 
-# Script to Run Target Command within ytb2audiobot Docker Container
-# This script executes a target command inside the container for the ytb2audiobot project.
-# It checks if silent mode is enabled via an environment variable and adjusts the output accordingly.
+# Docker runner script for the ytb2audiobot project.
+# This script executes a target command inside the Docker container for ytb2audiobot.
+# It supports silent mode to suppress output based on the SILENT_MODE environment variable.
 
-echo -e "[docker-runner-bot.sh] 🐳 Running ytb2audiobot script in Docker container..."
+echo -e "[docker-runner-bot.sh] 🐳 Starting ytb2audiobot in Docker container..."
 
 # Set default for SILENT_MODE if not provided
-: "${SILENT_MODE:=false}"
+SILENT_MODE="${SILENT_MODE:-false}"
 
-# Check if SILENT_MODE is enabled, adjust logging behavior based on its value
+LOG_TO_FILE="${LOG_TO_FILE:-false}"
+
+# Function to log messages based on silent mode
+log_message() {
+    if [ "$SILENT_MODE" != true ]; then
+        echo "[docker-runner-bot.sh] $1"
+    fi
+}
+
+log_message "SILENT_MODE is set to $SILENT_MODE."
+log_message "To change the silent mode setting, set the environment variable SILENT_MODE to true or false."
+
+# Execute the ytb2audiobot command with or without output suppression
 if [ "$SILENT_MODE" = true ]; then
-    echo "[docker-runner-bot.sh] 🔐🙊 Silent mode is ON. The target command will run without any log output. [terminal_log > /dev/null 2>&1]"
-    echo "[docker-runner-bot.sh] ⚠️ To disable silent mode, set the environment variable SILENT_MODE=false"
-    echo "[docker-runner-bot.sh] Bot is running ... (silent mode)"
-    echo ""
-
-    # Execute the target command silently (suppress output)
+    log_message "Silent mode is ON. The command will run without log output."
     ytb2audiobot > /dev/null 2>&1
-
+elif [ "$LOG_TO_FILE" = true ]; then
+    log_message "Logging mode is ON. The command output will be saved to output.log."
+    ytb2audiobot | tee -a output.log
 else
-    echo "[docker-runner-bot.sh] 🔓📟 Silent mode is OFF. The target command will run with log output."
-    echo "[docker-runner-bot.sh] ⚠️ To enable silent mode [terminal_log > /dev/null 2>&1], set the environment variable SILENT_MODE=true."
-    echo ""
-
+    log_message "Silent mode is OFF. Running command with log output."
     ytb2audiobot
-
 fi
-
-# End of Script
