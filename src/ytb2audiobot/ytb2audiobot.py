@@ -520,6 +520,7 @@ async def run_bot_asynchronously():
 
 
 def main():
+    print('MAIN')
     parser = argparse.ArgumentParser(
         description='🥭 Bot. Youtube to audio telegram bot with subtitles',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)

@@ -3,6 +3,7 @@
 data
 
 *.env
+*.log
 
 autodownload_chat_ids_hashed.txt
 
