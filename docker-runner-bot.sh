@@ -23,11 +23,11 @@ if [ "$SILENT_MODE" = true ]; then
 elif [ "$LOG_TO_FILE" = true ]; then
     if [[ -n "${LOG2TELEGRAM_BOT_TOKEN}" && -n "${LOG2TELEGRAM_CHAT_ID}" ]]; then
       echo "[docker-runner-bot.sh] 🦨 Running with log2telegram bot "
-      log2telegram --filter-color-chars --filter-timestamps $LOG_FILE_NAME &
-      ytb2audiobot | tee -a $LOG_FILE_NAME
+      log2telegram --filter-color-chars --filter-timestamps $LOG_FILE_NAME > log2telegram.log 2>&1 &
+      ytb2audiobot 2>&1 | tee -a $LOG_FILE_NAME
     else
       echo "[docker-runner-bot.sh] 💾 Logging mode is ON. The command output will be saved to output.log."
-      ytb2audiobot | tee -a $LOG_FILE_NAME
+      ytb2audiobot 2>&1 | tee -a $LOG_FILE_NAME
     fi
 else
     echo "[docker-runner-bot.sh] 📟 Silent mode is OFF. Running command with standart log output."
