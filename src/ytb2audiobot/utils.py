@@ -5,6 +5,7 @@ import pprint
 import re
 import pathlib
 import datetime
+import time
 from typing import Union
 
 import aiofiles
@@ -230,8 +231,20 @@ async def run_command_old(cmd):
     return stdout.decode(), stderr.decode(), process.returncode
 
 
-async def run_command(cmd):
-    """Run a command asynchronously and log output in real-time."""
+async def run_command(cmd: str, timeout: int = None, throttle_delay: int = 0):
+    """
+    Run a command asynchronously with a timeout option and log output in real-time.
+
+    Args:
+        cmd (str): The shell command to execute.
+        timeout (int or None): Timeout in seconds. If None, no timeout is applied.
+
+    Returns:
+        tuple: (stdout, stderr, return_code)
+        :param cmd:
+        :param timeout:
+        :param throttle_delay:
+    """
     process = await asyncio.create_subprocess_shell(
         cmd,
         stdout=asyncio.subprocess.PIPE,
@@ -242,28 +255,52 @@ async def run_command(cmd):
     stdout_lines = []
     stderr_lines = []
 
-    async def read_stream(stream, log_func, lines):
-        """Helper to read a stream line by line and log each line."""
+    async def read_stream(stream, log_func, lines, _throttle_delay):
+        """Helper to read a stream line by line and log each line with a throttle delay."""
+        last_log_time = time.time()
+
         while True:
             line = await stream.readline()
             if line:
                 decoded_line = line.decode().strip()
-                log_func(decoded_line)
+
+                # Apply throttle logic: only log if enough time has passed
+                current_time = time.time()
+                if current_time - last_log_time >= _throttle_delay:
+                    log_func(decoded_line)
+                    last_log_time = current_time
+
                 lines.append(decoded_line)  # Store the line for final return
             else:
                 break
 
-    # Use tasks to read stdout and stderr concurrently
-    await asyncio.gather(
-        read_stream(process.stdout, logger.debug, stdout_lines),
-        read_stream(process.stderr, logger.error, stderr_lines)
-    )
+    try:
+        # Use asyncio.gather with a timeout if specified
+        if timeout is not None:
+            await asyncio.wait_for(
+                asyncio.gather(
+                    read_stream(process.stdout, logger.debug, stdout_lines, throttle_delay),
+                    read_stream(process.stderr, logger.error, stderr_lines, throttle_delay)
+                ),
+                timeout=timeout
+            )
+            # Wait for the process to exit within the timeout
+            return_code = await asyncio.wait_for(process.wait(), timeout=timeout)
+        else:
+            # No timeout applied
+            await asyncio.gather(
+                read_stream(process.stdout, logger.debug, stdout_lines, throttle_delay),
+                read_stream(process.stderr, logger.error, stderr_lines, throttle_delay)
+            )
+            return_code = await process.wait()
 
-    # Wait for the process to exit
-    return_code = await process.wait()
+    except asyncio.TimeoutError:
+        logger.error("Command timed out. Killing process.")
+        process.kill()
+        await process.wait()  # Ensure process cleanup
+        return "\n".join(stdout_lines), "\n".join(stderr_lines), None
 
     return "\n".join(stdout_lines), "\n".join(stderr_lines), return_code
-
 
 def remove_all_in_dir(data_dir: pathlib.Path):
     for item in data_dir.iterdir():

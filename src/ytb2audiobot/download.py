@@ -50,13 +50,17 @@ async def make_split_audio_second(audio_path: pathlib.Path, segments: list) -> l
         segments[0]['path'] = audio_path
         return segments
 
+    convert_option = '-c copy'
+    if audio_path.suffix == '.mp3':
+        pass
+
     cmds_list = []
     for idx, segment in enumerate(segments):
         segment_file = audio_path.with_stem(f'{audio_path.stem}-p{idx + 1}-of{len(segments)}')
         print('💜', segment_file)
         segments[idx]['path'] = segment_file
         cmd = (
-            f'ffmpeg -i {audio_path.as_posix()} -ss {time_format(segment['start'])} -to {time_format(segment['end'])} -c copy -y {segment_file.as_posix()}')
+            f'ffmpeg -i {audio_path.as_posix()} -ss {time_format(segment['start'])} -to {time_format(segment['end'])} {convert_option} -y {segment_file.as_posix()}')
         print('💜💜', cmd, type(cmd))
         cmds_list.append(cmd)
 

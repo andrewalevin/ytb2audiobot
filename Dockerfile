@@ -2,9 +2,20 @@ FROM python
 
 WORKDIR /app
 
-RUN apt-get update
+# Update and install necessary dependencies
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    curl \
+    gnupg2 \
+    lsb-release \
+    nodejs
 
-RUN apt-get install ffmpeg -y
+# Install Node.js and npm
+#RUN curl -sL https://deb.nodesource.com/setup_16.x | bash - \
+#    && apt-get install -y nodejs
+
+# Install vot-cli globally using npm
+RUN npm install -g vot-cli
 
 ENV PYTHONUNBUFFERED=1
 

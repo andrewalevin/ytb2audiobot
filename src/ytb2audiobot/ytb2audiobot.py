@@ -3,6 +3,9 @@ import logging
 import os
 import argparse
 import asyncio
+import signal
+import sys
+
 from dotenv import load_dotenv
 from importlib.metadata import version
 
@@ -48,6 +51,7 @@ class StateFormMenuExtra(StatesGroup):
     slice_start_time = State()
     slice_end_time = State()
     url = State()
+    translate = State()
 
 
 @dp.message(CommandStart())
@@ -88,7 +92,9 @@ TEXT_EXTRA_OPTIONS = '''<b>🔮 Advanced options:</b>
     - ✏️ Get subtitles
     
     - 🍰️ Get slice of audio
-
+    
+    - 🌎️ Translate from any language into Russian
+    
 Select one of the []
 '''
 
@@ -112,7 +118,10 @@ async def case_show_options(message: types.Message, state: FSMContext):
                 InlineKeyboardButton(text='✏️ Get subtitles', callback_data=config.ACTION_NAME_SUBTITLES_SHOW_OPTIONS)],
             [
                 InlineKeyboardButton(text='🍰 Get slice', callback_data=config.ACTION_NAME_SLICE),
-                InlineKeyboardButton(text='🔚 Exit', callback_data=config.ACTION_NAME_OPTIONS_EXIT)]]))
+                InlineKeyboardButton(text='🌎 Translate', callback_data=config.ACTION_NAME_TRANSLATE)],
+            [
+                InlineKeyboardButton(text='🔚 Exit', callback_data=config.ACTION_NAME_OPTIONS_EXIT)],]))
+
 
 BITRATE_VALUES_ROW_ONE = ['48k', '64k', '96k', '128k']
 BITRATE_VALUES_ROW_TWO = ['196k', '256k', '320k']
@@ -182,6 +191,14 @@ async def case_options(callback_query: types.CallbackQuery, state: FSMContext):
             text="🍰 Step 1/2. Give me a START time of your slice.\n "
                  "In format 01:02:03. (hh:mm:ss) or 02:02 (mm:ss) or 78 seconds")
         await state.set_state(StateFormMenuExtra.slice_start_time)
+
+    elif action == config.ACTION_NAME_TRANSLATE:
+        await state.update_data(action=action)
+        await bot.edit_message_text(
+            chat_id=callback_query.from_user.id,
+            message_id=callback_query.message.message_id,
+            text=SEND_YOUTUBE_LINK_TEXT)
+        await state.set_state(StateFormMenuExtra.url)
 
     elif action == config.ACTION_NAME_OPTIONS_EXIT:
         await state.clear()
@@ -316,19 +333,19 @@ async def case_url(message: Message, state: FSMContext) -> None:
         split_duration = data.get('split_duration', '')
         await job_downloading(
             bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id, message_text=url,
-            info_message_id=None, options={'action': action, 'split_duration_minutes': split_duration})
+            info_message_id=None, configurations={'action': action, 'split_duration_minutes': split_duration})
 
     elif action == config.ACTION_NAME_SPLIT_BY_TIMECODES:
         await job_downloading(
             bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id, message_text=url,
-            info_message_id=None, options={'action': action})
+            info_message_id=None, configurations={'action': action})
 
     elif action == config.ACTION_NAME_BITRATE_CHANGE:
         bitrate = data.get('bitrate', '')
 
         await job_downloading(
             bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id, message_text=url,
-            info_message_id=None, options={'action': action, 'bitrate': bitrate})
+            info_message_id=None, configurations={'action': action, 'bitrate': bitrate})
 
     elif action == config.ACTION_NAME_SLICE:
         slice_start_time = data.get('slice_start_time', '')
@@ -336,8 +353,13 @@ async def case_url(message: Message, state: FSMContext) -> None:
 
         await job_downloading(
             bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id, message_text=url,
-            info_message_id=None, options={
+            info_message_id=None, configurations={
                 'action': action, 'slice_start_time': slice_start_time, 'slice_end_time': slice_end_time})
+
+    elif action == config.ACTION_NAME_TRANSLATE:
+        await job_downloading(
+            bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id, message_text=url,
+            info_message_id=None, configurations={'action': action})
 
 
 @dp.channel_post(Command('autodownload'))
@@ -431,7 +453,7 @@ async def handler_message(message: Message):
         await job_downloading(
             bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id,
             message_text=message.text,
-            options={'action': config.ACTION_NAME_BITRATE_CHANGE, 'bitrate': config.ACTION_MUSIC_HIGH_BITRATE})
+            configurations={'action': config.ACTION_NAME_BITRATE_CHANGE, 'bitrate': config.ACTION_MUSIC_HIGH_BITRATE})
         return
 
     logger.debug('🈯 DIRECT MESSAGE: ')
@@ -462,7 +484,7 @@ async def handler_channel_post(message: Message):
     if cli_action == config.ACTION_NAME_MUSIC:
         await job_downloading(
             bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id,
-            message_text=message.text, options={'action': cli_action, 'bitrate': config.ACTION_MUSIC_HIGH_BITRATE})
+            message_text=message.text, configurations={'action': cli_action, 'bitrate': config.ACTION_MUSIC_HIGH_BITRATE})
         return
 
     if autodownload_chat_manager.is_chat_id_inside(message.sender_chat.id):
@@ -519,8 +541,24 @@ async def run_bot_asynchronously():
         run_periodically(600, autodownload_chat_manager.save_hashed_chat_ids, {}))
 
 
+def handle_suspend(signal, frame):
+    """Handle the SIGTSTP signal (Ctrl+Z)."""
+    logger.info("Process suspended. Exiting...")
+    # No need to pause manually; the system handles the suspension
+    sys.exit(0)
+
+
+def handle_interrupt(signal, frame):
+    """Handle the SIGINT signal (Ctrl+C)."""
+    logger.info("Process interrupted by user. Exiting...")
+    sys.exit(0)
+
+
 def main():
-    print('MAIN')
+    signal.signal(signal.SIGTSTP, handle_suspend)
+    signal.signal(signal.SIGINT, handle_interrupt)
+    logger.info("Starting ... Press Ctrl+C to stop or Ctrl+Z to suspend.")
+
     parser = argparse.ArgumentParser(
         description='🥭 Bot. Youtube to audio telegram bot with subtitles',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)

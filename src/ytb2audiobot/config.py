@@ -217,6 +217,7 @@ ACTION_NAME_SUBTITLES_SHOW_OPTIONS = 'subtitles_show_options'
 ACTION_NAME_MUSIC = 'music_high_bitrate'
 ACTION_NAME_SLICE = 'slice'
 ACTION_NAME_OPTIONS_EXIT = 'options_exit'
+ACTION_NAME_TRANSLATE = 'translate'
 
 ENV_NAME_TOKEN = 'TG_TOKEN'
 ENV_NAME_SALT = 'HASH_SALT'

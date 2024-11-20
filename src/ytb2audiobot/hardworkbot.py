@@ -18,6 +18,7 @@ from ytb2audiobot.logger import logger
 from ytb2audiobot.download import download_thumbnail_from_download, \
     make_split_audio_second, get_chapters, get_timecodes_dict, filter_timecodes_within_bounds, \
     get_timecodes_formatted_text, download_audio_from_download
+from ytb2audiobot.translate import make_translate
 from ytb2audiobot.utils import seconds2humanview, capital2lower, \
     predict_downloading_time, get_data_dir, get_big_youtube_move_id, trim_caption_to_telegram_send, get_file_size, \
     truncate_filename_for_telegram, get_short_youtube_url
@@ -80,11 +81,11 @@ async def job_downloading(
         reply_to_message_id: int | None = None,
         message_text: str = '',
         info_message_id: int | None = None,
-        options=None):
-    if options is None:
-        options = {}
+        configurations=None):
+    if configurations is None:
+        configurations = {}
 
-    logger.debug(f'💹 Options: {options}')
+    logger.debug(f'💹 Options: {configurations}')
 
     movie_id = get_big_youtube_move_id(message_text)
     if not movie_id:
@@ -132,8 +133,20 @@ async def job_downloading(
             text='❌🎬🤔 Audio file for this video is unavailable for an unknown reason.')
         return
 
-    predict_time = predict_downloading_time(yt_info.get('duration'))
-    info_message = await info_message.edit_text(text=f'⏳ Downloading ~ {seconds2humanview(predict_time)} ... ')
+    action = configurations.get('action', '')
+    
+    if action == config.ACTION_NAME_TRANSLATE:
+        language = yt_info.get('language', '')
+        if language == 'ru':
+            await info_message.edit_text(
+                text=f'🌎🚫 This movie is still in Russian. You can download its audio directly. '
+                     f'Please give its URL again: ')
+            return
+        info_message = await info_message.edit_text(text=f'⏳ Translation starting. It could takes some time ... ')
+
+    else:
+        predict_time = predict_downloading_time(yt_info.get('duration'))
+        info_message = await info_message.edit_text(text=f'⏳ Downloading ~ {seconds2humanview(predict_time)} ... ')
 
     data_dir = get_data_dir()
     title = yt_info.get('title', '')
@@ -152,8 +165,6 @@ async def job_downloading(
 
     thumbnail_path = config.get_thumbnail_path(data_dir, movie_id)
 
-    action = options.get('action', '')
-
     yt_dlp_options = get_yt_dlp_options()
 
     logger.debug(f'🈺 action = {action}\n\n')
@@ -162,14 +173,14 @@ async def job_downloading(
     bitrate = '48k'
 
     if action == config.ACTION_NAME_BITRATE_CHANGE:
-        new_bitrate = options.get('bitrate', '')
+        new_bitrate = configurations.get('bitrate', '')
         if new_bitrate in config.BITRATES_VALUES:
             bitrate = new_bitrate
         yt_dlp_options = get_yt_dlp_options({'audio-quality': bitrate})
 
     if action == config.ACTION_NAME_SLICE:
-        start_time = str(options.get('slice_start_time'))
-        end_time = str(options.get('slice_end_time'))
+        start_time = str(configurations.get('slice_start_time'))
+        end_time = str(configurations.get('slice_end_time'))
 
         start_time_hhmmss = standardize_time_format(timedelta_from_seconds(start_time))
         end_time_hhmmss = standardize_time_format(timedelta_from_seconds(end_time))
@@ -192,12 +203,20 @@ async def job_downloading(
     # Run tasks with timeout
     async def handle_download():
         try:
+            func_main_down = download_audio_from_download(
+                movie_id=movie_id, output_path=audio_path, options=yt_dlp_options)
+
+            if action == config.ACTION_NAME_TRANSLATE:
+                func_main_down = make_translate(
+                    movie_id=movie_id,
+                    output_path=audio_path,
+                    timeout=60*23)
+
             result = await asyncio.wait_for(
                 timeout=config.TASK_TIMEOUT_SECONDS,
                 fut=asyncio.gather(
                     asyncio.create_task(
-                        download_audio_from_download(
-                            movie_id=movie_id, output_path=audio_path, options=yt_dlp_options)),
+                       func_main_down),
                     asyncio.create_task(
                         download_thumbnail_from_download(
                             movie_id=movie_id, output_path=thumbnail_path))))
@@ -228,7 +247,7 @@ async def job_downloading(
     _SEGMENT_DURATION = 39
 
     if action == config.ACTION_NAME_SPLIT_BY_DURATION:
-        split_duration_minutes = int(options.get('split_duration_minutes', 0))
+        split_duration_minutes = int(configurations.get('split_duration_minutes', 0))
         if split_duration_minutes > 0:
             segments = get_segments_by_duration(
                 total_duration=duration,
@@ -283,14 +302,17 @@ async def job_downloading(
     additional_caption_text = ''
 
     if action == config.ACTION_NAME_SLICE:
-        start_time = str(options.get('slice_start_time'))
-        end_time = str(options.get('slice_end_time'))
+        start_time = str(configurations.get('slice_start_time'))
+        end_time = str(configurations.get('slice_end_time'))
 
         start_time_hhmmss = standardize_time_format(timedelta_from_seconds(start_time))
         end_time_hhmmss = standardize_time_format(timedelta_from_seconds(end_time))
 
         additional_caption_text += f'\n\n{config.CAPTION_SLICE.substitute(
             start_time=start_time_hhmmss, end_time=end_time_hhmmss)}'
+
+    if action == config.ACTION_NAME_TRANSLATE:
+        caption_head = '🌎 Translation: \n' + caption_head
 
     await info_message.edit_text('⌛🚀️ Uploading to Telegram ... ')
 
@@ -315,7 +337,8 @@ async def job_downloading(
             timecodes=timecodes_text,
             additional=additional_caption_text)
 
-        audio_filename_for_telegram = f'{title}-{audio_filename}'
+        # todo English filename EX https://www.youtube.com/watch?v=gYeyOZTgf2g
+        audio_filename_for_telegram = f'{title}-' + pathlib.Path(segment.get('path')).name
         _filename = audio_filename_for_telegram if len(segments) == 1 else f'p{idx + 1}_of{len(segments)} {audio_filename_for_telegram}'
 
         await bot.send_audio(
