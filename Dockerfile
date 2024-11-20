@@ -10,8 +10,11 @@ RUN apt-get update && apt-get install -y \
     lsb-release
 
 # Install Node.js and npm
-RUN curl -sL https://deb.nodesource.com/setup_16.x | sh - \
+RUN curl -sL https://deb.nodesource.com/setup_current.x | sh - \
     && apt-get install -y nodejs
+
+# Update npm to the latest version
+RUN npm install -g npm@latest
 
 # Install vot-cli globally using npm
 RUN npm install -g vot-cli
