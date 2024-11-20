@@ -7,12 +7,11 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     curl \
     gnupg2 \
-    lsb-release \
-    nodejs
+    lsb-release
 
 # Install Node.js and npm
-#RUN curl -sL https://deb.nodesource.com/setup_16.x | bash - \
-#    && apt-get install -y nodejs
+RUN curl -sL https://deb.nodesource.com/setup_16.x | sh - \
+    && apt-get install -y nodejs
 
 # Install vot-cli globally using npm
 RUN npm install -g vot-cli
