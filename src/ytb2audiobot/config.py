@@ -261,17 +261,18 @@ def get_yt_dlp_options(override_options=None):
 
 
 # 255 max - minus additionals
-MAX_TELEGRAM_FILENAME_LENGTH = 64
+TG_MAX_FILENAME_LEN = 61
 
 CLI_ACTIVATION_SUBTITLES = ['subtitles', 'subs', 'sub']
 CLI_ACTIVATION_MUSIC = ['music', 'song']
-CLI_ACTIVATION_ALL = CLI_ACTIVATION_SUBTITLES + CLI_ACTIVATION_MUSIC
+CLI_ACTIVATION_TRANSLATION = ['translation', 'translate', 'transl', 'trans', 'tran', 'tra', 'tr']
+CLI_ACTIVATION_ALL = CLI_ACTIVATION_SUBTITLES + CLI_ACTIVATION_MUSIC + CLI_ACTIVATION_TRANSLATION
 
 ACTION_MUSIC_HIGH_BITRATE = BITRATES_VALUES[-1]
 
 ADDITIONAL_CHAPTER_BLOCK = Template('\n\n📌 <b>$title</b>\n[Chapter +${time_shift}]')
 
-SEGMENTS_PADDING_SEC = 6
+SEGMENT_DUARITION_PADDING_SEC = 6
 
 
 TEXT_SAY_HELLO_BOT_OWNER_AT_STARTUP = Template(
@@ -286,3 +287,5 @@ YT_DLP_OPTIONS_DEFAULT_2 = ('--extract-audio --audio-format m4a --audio-quality 
                           ' --embed-thumbnail --console-title --embed-metadata'
                           ' --newline --progress-delta 2 --break-on-existing')
 
+SEGMENT_AUDIO_DURATION_SEC = 39 * 60
+SEGMENT_AUDIO_DURATION_SPLIT_THRESHOLD_SEC = 101 * 60

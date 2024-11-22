@@ -57,13 +57,14 @@ class StateFormMenuExtra(StatesGroup):
 @dp.message(CommandStart())
 @dp.message(Command('help'))
 async def handler_command_start_and_help(message: Message) -> None:
-    logger.debug('💈 handler_command_start_and_help(): ')
+    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
+
     await message.answer(text=config.START_COMMAND_TEXT, parse_mode='HTML')
 
 
 @dp.message(Command(commands=['version', 'ver', 'v']))
 async def handler_version_bot(message: Message) -> None:
-    logger.debug('💈 handler_version_bot(): ')
+    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
 
     await message.reply(f"🟢 {config.PACKAGE_NAME} version: {version(config.PACKAGE_NAME)}")
 
@@ -73,7 +74,7 @@ TG_EXTRA_OPTIONS_LIST = ['extra', 'options', 'advanced', 'ext', 'ex', 'opt', 'op
 
 @dp.channel_post(Command(commands=TG_EXTRA_OPTIONS_LIST))
 async def handler_extra_options_except_channel_post(message: Message) -> None:
-    logger.debug('💈 handler_extra_options_except_channel_post(): ')
+    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
 
     await message.answer('❌ This command works only in bot not in channels.')
 
@@ -101,7 +102,7 @@ Select one of the []
 
 @dp.message(Command(commands=TG_EXTRA_OPTIONS_LIST), StateFilter(default_state))
 async def case_show_options(message: types.Message, state: FSMContext):
-    logger.debug('💈 case_show_options(): ')
+    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
 
     await state.set_state(StateFormMenuExtra.options)
     await bot.send_message(
@@ -206,7 +207,7 @@ async def case_options(callback_query: types.CallbackQuery, state: FSMContext):
 
 @dp.callback_query(StateFormMenuExtra.split_by_duration)
 async def case_split_by_duration_processing(callback_query: types.CallbackQuery, state: FSMContext):
-    logger.debug('💈 case_split_by_duration_processing(): ')
+    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
 
     split_duration = callback_query.data
     if split_duration not in SPLIT_DURATION_VALUES_ALL:
@@ -223,7 +224,7 @@ async def case_split_by_duration_processing(callback_query: types.CallbackQuery,
 
 @dp.callback_query(StateFormMenuExtra.bitrate)
 async def case_bitrate_processing(callback_query: types.CallbackQuery, state: FSMContext):
-    logger.debug('💈 case_bitrate_processing(): ')
+    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
 
     bitrate = callback_query.data
     if bitrate not in BITRATE_VALUES_ALL:
@@ -240,7 +241,7 @@ async def case_bitrate_processing(callback_query: types.CallbackQuery, state: FS
 
 @dp.callback_query(StateFormMenuExtra.subtitles_options)
 async def case_subtitles_options_processing(callback_query: types.CallbackQuery, state: FSMContext):
-    logger.debug('💈 case_subtitles_options_processing(): ')
+    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
 
     action = callback_query.data
     if action == config.ACTION_NAME_SUBTITLES_GET_ALL:
@@ -260,7 +261,7 @@ async def case_subtitles_options_processing(callback_query: types.CallbackQuery,
 
 @dp.message(StateFormMenuExtra.subtitles_search_word)
 async def case_subtitles_search_word(message: types.Message, state: FSMContext):
-    logger.debug('💈 case_subtitles_search_word(): ')
+    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
 
     subtitles_search_word = message.text
     await state.update_data(subtitles_search_word=subtitles_search_word)
@@ -307,7 +308,7 @@ async def case_slice_start_time(message: types.Message, state: FSMContext):
 
 @dp.message(StateFormMenuExtra.url)
 async def case_url(message: Message, state: FSMContext) -> None:
-    logger.debug('💈 case_url(): ')
+    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
 
     url = message.text
     data = await state.get_data()
@@ -364,7 +365,7 @@ async def case_url(message: Message, state: FSMContext) -> None:
 
 @dp.channel_post(Command('autodownload'))
 async def handler_autodownload_switch_state(message: types.Message) -> None:
-    logger.debug('💈 handler_autodownload_switch_state(): ')
+    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
 
     if autodownload_chat_manager.toggle_chat_state(message.sender_chat.id):
         await message.answer('💾 Added Chat ID to autodownloads.\n\nCall /autodownload again to remove.')
@@ -374,7 +375,7 @@ async def handler_autodownload_switch_state(message: types.Message) -> None:
 
 @dp.message(Command('autodownload'))
 async def handler_autodownload_command_in_bot(message: types.Message) -> None:
-    logger.debug('💈 handler_autodownload_command_in_bot():')
+    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
 
     await message.answer(
         text='❌ This command works only in Channels. Add this bot to the list of admins and call it call then')
@@ -382,7 +383,7 @@ async def handler_autodownload_command_in_bot(message: types.Message) -> None:
 
 @dp.callback_query(lambda c: c.data.startswith('download:'))
 async def process_callback_button(callback_query: types.CallbackQuery):
-    logger.debug('💈 process_callback_button(): ')
+    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
 
     await bot.answer_callback_query(callback_query.id)
 
@@ -402,6 +403,8 @@ async def process_callback_button(callback_query: types.CallbackQuery):
 
 
 def cli_action_parser(text: str):
+    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
+
     action = ''
     attributes = {}
 
@@ -411,6 +414,7 @@ def cli_action_parser(text: str):
     if matching_attr is None:
         return action, attributes
 
+    logger.debug(f'🌀 cli_action_parser: 4 matching_attr={matching_attr}')
     if matching_attr in config.CLI_ACTIVATION_SUBTITLES:
         action = config.ACTION_NAME_SUBTITLES_GET_ALL
 
@@ -423,16 +427,18 @@ def cli_action_parser(text: str):
                 action = config.ACTION_NAME_SUBTITLES_SEARCH_WORD
                 attributes['word'] = word
 
-    logger.debug(f'🌀 cli_action_parser: 4 matching_attr={matching_attr}')
     if matching_attr in config.CLI_ACTIVATION_MUSIC:
         action = config.ACTION_NAME_MUSIC
+
+    if matching_attr in config.CLI_ACTIVATION_TRANSLATION:
+        action = config.ACTION_NAME_TRANSLATE
 
     return action, attributes
 
 
 @dp.message()
 async def handler_message(message: Message):
-    logger.debug('💈🏧  handler_message(): ')
+    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
 
     cli_action, cli_attributes = cli_action_parser(message.text)
 
@@ -440,31 +446,34 @@ async def handler_message(message: Message):
         if cli_attributes['url']:
             await make_subtitles(
                 bot=bot, sender_id=message.from_user.id, url=cli_attributes['url'], reply_message_id=message.message_id)
-            return
 
-    if cli_action == config.ACTION_NAME_SUBTITLES_SEARCH_WORD:
+    elif cli_action == config.ACTION_NAME_SUBTITLES_SEARCH_WORD:
         if cli_attributes['url'] and cli_attributes['word']:
             await make_subtitles(
                 bot=bot, sender_id=message.from_user.id, url=cli_attributes['url'], reply_message_id=message.message_id,
                 word=cli_attributes['word'])
-            return
 
-    if cli_action == config.ACTION_NAME_MUSIC:
+    elif cli_action == config.ACTION_NAME_MUSIC:
         await job_downloading(
             bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id,
             message_text=message.text,
             configurations={'action': config.ACTION_NAME_BITRATE_CHANGE, 'bitrate': config.ACTION_MUSIC_HIGH_BITRATE})
-        return
 
-    logger.debug('🈯 DIRECT MESSAGE: ')
-    await job_downloading(
-        bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id,
-        message_text=message.text)
+    elif cli_action == config.ACTION_NAME_TRANSLATE:
+        await job_downloading(
+            bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id,
+            message_text=message.text,
+            configurations={'action': config.ACTION_NAME_TRANSLATE})
+    else:
+        logger.debug('🈯 DIRECT MESSAGE: ')
+        await job_downloading(
+            bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id,
+            message_text=message.text)
 
 
 @dp.channel_post()
 async def handler_channel_post(message: Message):
-    logger.debug('💈 handler_channel_post(): ')
+    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
 
     cli_action, cli_attributes = cli_action_parser(message.text)
 
@@ -485,6 +494,12 @@ async def handler_channel_post(message: Message):
         await job_downloading(
             bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id,
             message_text=message.text, configurations={'action': cli_action, 'bitrate': config.ACTION_MUSIC_HIGH_BITRATE})
+        return
+
+    if cli_action == config.ACTION_NAME_TRANSLATE:
+        await job_downloading(
+            bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id,
+            message_text=message.text, configurations={'action': cli_action})
         return
 
     if autodownload_chat_manager.is_chat_id_inside(message.sender_chat.id):
@@ -516,6 +531,8 @@ async def handler_channel_post(message: Message):
 
 
 async def run_bot_asynchronously():
+    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
+
     me = await bot.get_me()
     logger.info(f'🚀 Telegram bot: f{me.full_name} https://t.me/{me.username}')
 
@@ -542,6 +559,8 @@ async def run_bot_asynchronously():
 
 
 def handle_suspend(signal, frame):
+    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
+
     """Handle the SIGTSTP signal (Ctrl+Z)."""
     logger.info("Process suspended. Exiting...")
     # No need to pause manually; the system handles the suspension
@@ -549,6 +568,8 @@ def handle_suspend(signal, frame):
 
 
 def handle_interrupt(signal, frame):
+    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
+
     """Handle the SIGINT signal (Ctrl+C)."""
     logger.info("Process interrupted by user. Exiting...")
     sys.exit(0)

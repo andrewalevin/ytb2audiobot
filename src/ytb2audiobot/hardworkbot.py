@@ -1,12 +1,15 @@
 import asyncio
+import inspect
 import math
 import os
 import pathlib
+from datetime import datetime
 from string import Template
 
+import humanize
 import yt_dlp
 from aiogram import Bot
-from aiogram.types import FSInputFile, BufferedInputFile
+from aiogram.types import FSInputFile, BufferedInputFile, Message
 from ytbtimecodes.timecodes import extract_timecodes, timedelta_from_seconds, standardize_time_format
 
 from ytb2audiobot import config
@@ -24,6 +27,36 @@ from ytb2audiobot.utils import seconds2humanview, capital2lower, \
     truncate_filename_for_telegram, get_short_youtube_url
 
 DEBUG = False if os.getenv(config.ENV_NAME_DEBUG_MODE, 'false').lower() != 'true' else True
+
+
+async def telegram_send_large_text(send_func, text, max_size=4096, delay=0.5, **kwargs):
+    """
+    Sends a large text message by splitting it into chunks if it exceeds `max_size`,
+    with a delay between each chunk to avoid hitting Telegram API limits.
+
+    Args:
+        send_func (callable): The function to send the text (e.g., bot.send_message or message.edit_text).
+        text (str): The text to send.
+        max_size (int): Maximum size of a single message (default is 4096 for Telegram).
+        delay (float): Delay in seconds between sending chunks to avoid API flood (default is 0.5).
+        **kwargs: Additional arguments to pass to the send function (e.g., chat_id, parse_mode).
+    """
+    # Split text into chunks
+    text_chunks = [text[i:i + max_size] for i in range(0, len(text), max_size)]
+
+    # Send the first chunk
+    await send_func(text=text_chunks[0], **kwargs)
+
+    # Send additional chunks (if any), with delay
+    for chunk in text_chunks[1:]:
+        await asyncio.sleep(delay)  # Delay to avoid flooding
+        await send_func(text=chunk, **kwargs)
+
+
+async def handle_error(e: Exception, info_message: Message, notice: str):
+    text = f'🔴 {notice}\n\n{e}'
+    logger.error(text)
+    await telegram_send_large_text(info_message, text)
 
 
 async def make_subtitles(
@@ -48,22 +81,18 @@ async def make_subtitles(
         await info_message.edit_text('🔴 Can t get valid youtube movie id out of your url')
         return
 
-    print(f'🐸 WORD SEARCH - url={url}, word={word}')
     text = await get_subtitles_here(url, word)
-    print('RESULT: ', text)
-    print()
 
-    caption = f'✏️ Subtitles\n\n{get_short_youtube_url(movie_id)}\n\n '
-
+    caption = f'✏️ Subtitles\n\n{get_short_youtube_url(movie_id)}'
     if word:
-        caption += f'🔎 Search word: {word}\n\n' if text else '🔦 Nothing Found! 😉\n\n'
+        caption += f'\n\n'
+        caption += f'🔎 Search word: {word}' if text else '🔦 Nothing Found! 😉'
 
-    if len(caption + text) < config.TELEGRAM_MAX_MESSAGE_TEXT_SIZE:
+    if len(f'{caption}\n\n{text}') < config.TELEGRAM_MAX_MESSAGE_TEXT_SIZE:
         await bot.send_message(
             chat_id=sender_id,
-            text=f'{caption}{text}',
+            text=f'{caption}\n\n{text}',
             parse_mode='HTML')
-        await info_message.delete()
     else:
         text = highlight_words_file_text(text, word)
         await bot.send_document(
@@ -72,7 +101,8 @@ async def make_subtitles(
             document=BufferedInputFile(
                 filename=f'subtitles-{movie_id}.txt',
                 file=text.encode('utf-8')))
-        await info_message.delete()
+
+    await info_message.delete()
 
 
 async def job_downloading(
@@ -85,7 +115,8 @@ async def job_downloading(
     if configurations is None:
         configurations = {}
 
-    logger.debug(f'💹 Options: {configurations}')
+    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
+    logger.debug(f'💹 Configurations Started: {configurations}')
 
     movie_id = get_big_youtube_move_id(message_text)
     if not movie_id:
@@ -104,14 +135,15 @@ async def job_downloading(
         'logtostderr': False,  # Avoids logging to stderr, logs to the logger instead
         'quiet': True,  # Suppresses default output,
         'nocheckcertificate': True,
-        'no_warnings': True}
+        'no_warnings': True,
+        'skip_download': True,}
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             yt_info = ydl.extract_info(f"https://www.youtube.com/watch?v={movie_id}", download=False)
     except Exception as e:
-        logger.error(f'🍅 Cant Extract YT_DLP info. \n{e}')
-        await info_message.edit_text(text=f'🍅 Cant Extract YT_DLP info. \n{e}')
+        logger.error(f'🔴 Cant Extract YT_DLP info. \n\n{e}')
+        await info_message.edit_text(f'🔴 Cant Extract YT_DLP info about this movie.')
         return
 
     if yt_info.get('is_live'):
@@ -120,7 +152,7 @@ async def job_downloading(
         return
 
     if not yt_info.get('title') or not yt_info.get('duration'):
-        await info_message.edit_text(text='❌🎬💔 No title or duration info of this video.')
+        await info_message.edit_text('❌🎬💔 No title or duration info of this video.')
         return
 
     if not yt_info.get('filesize_approx', ''):
@@ -142,13 +174,14 @@ async def job_downloading(
                 text=f'🌎🚫 This movie is still in Russian. You can download its audio directly. '
                      f'Please give its URL again: ')
             return
-        info_message = await info_message.edit_text(text=f'⏳ Translation starting. It could takes some time ... ')
+
+        # todo time
+        info_message = await info_message.edit_text(text=f'⏳ 🌎Translation is starting. It could takes some time ... ')
 
     else:
         predict_time = predict_downloading_time(yt_info.get('duration'))
         info_message = await info_message.edit_text(text=f'⏳ Downloading ~ {seconds2humanview(predict_time)} ... ')
 
-    data_dir = get_data_dir()
     title = yt_info.get('title', '')
     description = yt_info.get('description', '')
     author = yt_info.get('uploader', '')
@@ -163,8 +196,6 @@ async def job_downloading(
 
     # todo add depend on predict
 
-    thumbnail_path = config.get_thumbnail_path(data_dir, movie_id)
-
     yt_dlp_options = get_yt_dlp_options()
 
     logger.debug(f'🈺 action = {action}\n\n')
@@ -178,6 +209,13 @@ async def job_downloading(
             bitrate = new_bitrate
         yt_dlp_options = get_yt_dlp_options({'audio-quality': bitrate})
 
+    data_dir = get_data_dir()
+    audio_path = data_dir / f'{movie_id}-{bitrate}.m4a'
+    thumbnail_path = data_dir / f'{movie_id}-thumbnail.jpg'
+
+    if action == config.ACTION_NAME_TRANSLATE:
+        audio_path = data_dir / f'{movie_id}-transl-ru-{bitrate}.mp3'
+
     if action == config.ACTION_NAME_SLICE:
         start_time = str(configurations.get('slice_start_time'))
         end_time = str(configurations.get('slice_end_time'))
@@ -187,16 +225,6 @@ async def job_downloading(
 
         yt_dlp_options += f' --postprocessor-args \"-ss {start_time_hhmmss} -t {end_time_hhmmss}\"'
         print(f'🍰 Slice yt_dlp_options = {yt_dlp_options}')
-
-    audio_filename = config.AUDIO_FILENAME_TEMPLATE.substitute(
-        movie_id=movie_id,
-        bitrate=f'-{bitrate}',
-        extension='.m4a')
-    audio_path = data_dir.joinpath(audio_filename)
-    thumbnail_filename = config.THUMBNAIL_FILENAME_TEMPLATE.substitute(
-        movie_id=movie_id,
-        extension='.jpg')
-    thumbnail_path = audio_path.parent.joinpath(thumbnail_filename)
 
     logger.debug(f'🈴🈴 yt_dlp_options = {yt_dlp_options}\n\n')
 
@@ -222,29 +250,33 @@ async def job_downloading(
                             movie_id=movie_id, output_path=thumbnail_path))))
             return result
         except asyncio.TimeoutError:
-            await info_message.edit_text(text='🚫 Download processing timed out. Please try again later.')
+            logger.error(f'🔴 TimeoutError. During download_processing().')
+            await info_message.edit_text(text='🔴 TimeoutError. During download_processing().')
             return None, None
         except Exception as e:
-            logger.error(f'🚫 Error during download_processing(): {e}')
-            await info_message.edit_text(text=f'🚫 Error during download_processing(): \n\n{str(e)}')
+            logger.error(f'🔴 Error during download_processing().\n\n{e}')
+            await info_message.edit_text(text=f'🔴 Error during download_processing().')
             return None, None
 
     audio_path, thumbnail_path = await handle_download()
     if audio_path is None:
-        return []
+        logger.error(f'🔴 audio_path is None after downloading. Exit.')
+        await info_message.edit_text(text=f'🔴 Error. Value audio_path is None after downloading. Exit.')
+        return
 
     audio_path = pathlib.Path(audio_path)
-
     if not audio_path.exists():
-        return []
+        logger.error(f'🔴 not audio_path.exists() after downloading. Exit.')
+        await info_message.edit_text(text=f'🔴 Error. Value audio_path not exists after downloading. Exit.')
+        return
 
     if thumbnail_path is not None:
         thumbnail_path = pathlib.Path(thumbnail_path)
+        if not thumbnail_path.exists():
+            thumbnail_path = None
 
     segments = [{'path': audio_path, 'start': 0, 'end': duration, 'title': ''}]
 
-    _THRESHOLD_SPLIT_MIN = 101
-    _SEGMENT_DURATION = 39
 
     if action == config.ACTION_NAME_SPLIT_BY_DURATION:
         split_duration_minutes = int(configurations.get('split_duration_minutes', 0))
@@ -256,17 +288,12 @@ async def job_downloading(
     elif action == config.ACTION_NAME_SPLIT_BY_TIMECODES:
         segments = get_segments_by_timecodes_from_dict(timecodes=timecodes_dict, total_duration=duration)
 
-    elif duration > 60 * _THRESHOLD_SPLIT_MIN:
+    elif duration > config.SEGMENT_AUDIO_DURATION_SPLIT_THRESHOLD_SEC:
         segments = get_segments_by_duration(
             total_duration=duration,
-            segment_duration=60 * _SEGMENT_DURATION)
+            segment_duration=config.SEGMENT_AUDIO_DURATION_SEC)
 
-    print(f'🌈 Segments:: {segments}')
-    print()
-
-    segments = add_paddings_to_segments(segments, config.SEGMENTS_PADDING_SEC)
-    print(f'🌈 After Padding Segments:: {segments}')
-    print()
+    segments = add_paddings_to_segments(segments, config.SEGMENT_DUARITION_PADDING_SEC)
 
     audio_file_size = await get_file_size(audio_path)
 
@@ -276,22 +303,20 @@ async def job_downloading(
 
     segments = segments_verification(segments, max_segment_duration)
 
-    print('🌈🌈 segments_audio After Verification: ', segments)
-
     if not segments:
-        await info_message.edit_text(text='💔 Nothing to send you after downloading. Sorry :(')
+        logger.error(f'🔴 No audio segments after processing. It could be internal error.')
+        await info_message.edit_text(f'🔴 Error. No audio segments after processing. It could be internal error.')
         return
 
     try:
         segments = await make_split_audio_second(audio_path, segments)
     except Exception as e:
-        print('Error:', e)
-        # logger.error(f'💔 Error with Audio Split \n\n{e}')
-        # await info_message.edit_text(text=f'💔 Error with Audio Split \n\n{e}')
-        return
+        logger.error(f'🔴 Error during splitting audio by segments.\n\n{e}')
+        await info_message.edit_text(f'🔴 Error during splitting audio by segments.')
 
     if not segments:
-        await info_message.edit_text(text='💔 Nothing to send you after audio split. Sorry :(')
+        logger.error(f'🔴 No audio segments after splitting.')
+        await info_message.edit_text(f'🔴 Error. No audio segments after processing.')
         return
 
     caption_head = config.CAPTION_HEAD_TEMPLATE.safe_substitute(
@@ -299,17 +324,13 @@ async def job_downloading(
         title=capital2lower(title),
         author=capital2lower(author))
 
-    additional_caption_text = ''
+    caption_head_additional = ''
 
     if action == config.ACTION_NAME_SLICE:
-        start_time = str(configurations.get('slice_start_time'))
-        end_time = str(configurations.get('slice_end_time'))
-
-        start_time_hhmmss = standardize_time_format(timedelta_from_seconds(start_time))
-        end_time_hhmmss = standardize_time_format(timedelta_from_seconds(end_time))
-
-        additional_caption_text += f'\n\n{config.CAPTION_SLICE.substitute(
-            start_time=start_time_hhmmss, end_time=end_time_hhmmss)}'
+        caption_head_additional += '\n\n'
+        caption_head_additional += config.CAPTION_SLICE.substitute(
+            start_time=standardize_time_format(timedelta_from_seconds(str(configurations.get('slice_start_time')))),
+            end_time=standardize_time_format(timedelta_from_seconds(str(configurations.get('slice_end_time')))))
 
     if action == config.ACTION_NAME_TRANSLATE:
         caption_head = '🌎 Translation: \n' + caption_head
@@ -321,11 +342,11 @@ async def job_downloading(
         start = segment.get('start')
         end = segment.get('end')
         filtered_timecodes_dict = filter_timecodes_within_bounds(
-            timecodes=timecodes_dict, start_time=start + config.SEGMENTS_PADDING_SEC, end_time=end - config.SEGMENTS_PADDING_SEC -1)
+            timecodes=timecodes_dict, start_time=start + config.SEGMENT_DUARITION_PADDING_SEC, end_time=end - config.SEGMENT_DUARITION_PADDING_SEC - 1)
         timecodes_text = get_timecodes_formatted_text(filtered_timecodes_dict, start)
 
         if segment.get('title'):
-            additional_caption_text += config.ADDITIONAL_CHAPTER_BLOCK.substitute(
+            caption_head_additional += config.ADDITIONAL_CHAPTER_BLOCK.substitute(
                 time_shift=standardize_time_format(timedelta_from_seconds(segment.get('start'))),
                 title=segment.get('title'))
             timecodes_text = ''
@@ -335,17 +356,21 @@ async def job_downloading(
             partition='' if len(segments) == 1 else f'[Part {idx + 1} of {len(segments)}]',
             duration=standardize_time_format(timedelta_from_seconds(segment_duration)),
             timecodes=timecodes_text,
-            additional=additional_caption_text)
+            additional=caption_head_additional)
+
+        segment_path = pathlib.Path(segment.get('path'))
 
         # todo English filename EX https://www.youtube.com/watch?v=gYeyOZTgf2g
-        audio_filename_for_telegram = f'{title}-' + pathlib.Path(segment.get('path')).name
-        _filename = audio_filename_for_telegram if len(segments) == 1 else f'p{idx + 1}_of{len(segments)} {audio_filename_for_telegram}'
+        fname_suffix = segment_path.name
+        fname_prefix = '' if len(segments) == 1 else f'p{idx + 1}_of{len(segments)}-'
+        fname_title_size = config.TG_MAX_FILENAME_LEN - len(fname_prefix) - len(fname_suffix)
+        fname_title = title[:fname_title_size]+'-' if fname_title_size > 6 else ''
 
         await bot.send_audio(
             chat_id=sender_id,
             audio=FSInputFile(
                 path=segment.get('path'),
-                filename=truncate_filename_for_telegram(_filename)),
+                filename=fname_prefix + fname_title + fname_suffix),
             duration=segment_duration,
             thumbnail=FSInputFile(path=thumbnail_path) if thumbnail_path is not None else None,
             caption=caption if len(caption) < config.TG_CAPTION_MAX_LONG else trim_caption_to_telegram_send(caption),

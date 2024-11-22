@@ -430,11 +430,11 @@ def get_short_youtube_url_with_http(movie_id: str = ''):
 def truncate_filename_for_telegram(filename: str) -> str:
     parts = filename.split('.')
     if len(parts) < 2:
-        return filename if len(filename) < config.MAX_TELEGRAM_FILENAME_LENGTH else filename[:config.MAX_TELEGRAM_FILENAME_LENGTH]
+        return filename if len(filename) < config.TG_MAX_FILENAME_LEN else filename[:config.TG_MAX_FILENAME_LEN]
 
     ext = '.' + parts[-1]
     all = '.'.join(parts[:-1])
-    size = config.MAX_TELEGRAM_FILENAME_LENGTH
+    size = config.TG_MAX_FILENAME_LEN
     size -= len(ext)
     all = all if len(all) < size else filename[:size]
     return all + ext
