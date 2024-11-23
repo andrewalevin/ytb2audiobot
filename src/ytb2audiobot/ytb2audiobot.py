@@ -92,9 +92,13 @@ DESCRIPTION_BLOCK_CLI = f'''
 DESCRIPTION_BLOCK_REFERENCES = f'''
 <b>References</b>
 
-- one 
-- two
-- three
+- https://t.me/ytb2audiostartbot (LTS)
+- https://t.me/ytb2audiobetabot (BETA) #todo-all-logs-info
+
+- https://andrewalevin.github.io/ytb2audiobot/
+- https://github.com/andrewalevin/ytb2audiobot
+- https://pypi.org/project/ytb2audiobot/
+- https://hub.docker.com/r/andrewlevin/ytb2audiobot
 '''.strip()
 
 START_AND_HELP_TEXT = f'''
