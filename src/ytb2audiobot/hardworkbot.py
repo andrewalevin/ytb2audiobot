@@ -214,7 +214,7 @@ async def job_downloading(
     thumbnail_path = data_dir / f'{movie_id}-thumbnail.jpg'
 
     if action == config.ACTION_NAME_TRANSLATE:
-        audio_path = data_dir / f'{movie_id}-transl-ru-{bitrate}.mp3'
+        audio_path = data_dir / f'{movie_id}-transl-ru-{bitrate}.m4a'
 
     if action == config.ACTION_NAME_SLICE:
         start_time = str(configurations.get('slice_start_time'))
@@ -276,7 +276,6 @@ async def job_downloading(
             thumbnail_path = None
 
     segments = [{'path': audio_path, 'start': 0, 'end': duration, 'title': ''}]
-
 
     if action == config.ACTION_NAME_SPLIT_BY_DURATION:
         split_duration_minutes = int(configurations.get('split_duration_minutes', 0))
