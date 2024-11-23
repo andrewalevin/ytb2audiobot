@@ -54,7 +54,8 @@ dependencies = [
   'ytbtimecodes',
   'yt-dlp',
   'ytb2subtitles',
-  'log2telegram'
+  'log2telegram',
+  'humanize',
 ]
 
 
