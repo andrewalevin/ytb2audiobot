@@ -187,11 +187,6 @@ CALLBACK_SLEEP_TIME_SECONDS = 8
 
 TEXT_STARTED_HEAD = '🚀 Bot has started!'
 
-HELP_COMMANDS_TEXT = '''
-/extra - 🔮Extra options
-/help - 🤔 Help'
-/autodownload - 🏂‍ (Works only in channels)
-'''
 
 
 def get_thumbnail_path(data_dir, movie_id):
@@ -273,10 +268,6 @@ ACTION_MUSIC_HIGH_BITRATE = BITRATES_VALUES[-1]
 ADDITIONAL_CHAPTER_BLOCK = Template('\n\n📌 <b>$title</b>\n[Chapter +${time_shift}]')
 
 SEGMENT_DUARITION_PADDING_SEC = 6
-
-
-TEXT_SAY_HELLO_BOT_OWNER_AT_STARTUP = Template(
-    '🚀 Bot has started! \n\n📦 Package Version: ${package_bot_version}\n${help_commands_text}')
 
 LOG_FORMAT_CALLED_FUNCTION = Template('💈💈 ${fname}():')
 

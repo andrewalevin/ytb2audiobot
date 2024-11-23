@@ -54,19 +54,84 @@ class StateFormMenuExtra(StatesGroup):
     translate = State()
 
 
+DESCRIPTION_BLOCK_WELCOME = f'''
+<b>🪩 Hello!</b>
+(version:  {version(config.PACKAGE_NAME)})
+
+I can download .... #todo
+ - one
+ - two
+'''.strip()
+
+DESCRIPTION_BLOCK_COMMANDS = f'''
+<b>Commands</b>
+/help
+/extra - 🔮Advanced options
+/autodownload - 🏂‍ (Works only in channels) See about #todo
+'''.strip()
+
+DESCRIPTION_BLOCK_EXTRA_OPTIONS = '''
+<b>🔮 Advanced options:</b> 
+
+ - Split by duration
+ - Split by timecodes
+ - Set audio Bitrate
+ - Get subtitles
+ - Get slice of audio
+ - Translate from any language
+'''.strip()
+
+DESCRIPTION_BLOCK_CLI = f'''
+<b>📟 CLI options</b>
+
+ - one
+ - two
+'''.strip()
+
+
+DESCRIPTION_BLOCK_REFERENCES = f'''
+<b>References</b>
+
+- one 
+- two
+- three
+'''.strip()
+
+START_AND_HELP_TEXT = f'''
+{DESCRIPTION_BLOCK_WELCOME}
+
+{DESCRIPTION_BLOCK_COMMANDS}
+
+{DESCRIPTION_BLOCK_EXTRA_OPTIONS}
+
+{DESCRIPTION_BLOCK_CLI}
+
+{DESCRIPTION_BLOCK_REFERENCES}
+'''.strip()
+
+TEXT_SAY_HELLO_BOT_OWNER_AT_STARTUP = f'''
+🚀 Bot has started! 
+
+📦 Package Version: {version(config.PACKAGE_NAME)}
+
+{DESCRIPTION_BLOCK_COMMANDS}
+'''.strip()
+
+
+DESCRIPTION_BLOCK_OKAY_AFTER_EXIT = f'''
+👋 Okay!
+Anytime you can give me a youtube link to download its audio or select one of the command:
+
+{DESCRIPTION_BLOCK_COMMANDS}
+'''.strip()
+
+
 @dp.message(CommandStart())
 @dp.message(Command('help'))
 async def handler_command_start_and_help(message: Message) -> None:
     logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
 
-    await message.answer(text=config.START_COMMAND_TEXT, parse_mode='HTML')
-
-
-@dp.message(Command(commands=['version', 'ver', 'v']))
-async def handler_version_bot(message: Message) -> None:
-    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
-
-    await message.reply(f"🟢 {config.PACKAGE_NAME} version: {version(config.PACKAGE_NAME)}")
+    await message.answer(text=START_AND_HELP_TEXT, parse_mode='HTML')
 
 
 TG_EXTRA_OPTIONS_LIST = ['extra', 'options', 'advanced', 'ext', 'ex', 'opt', 'op', 'adv', 'ad']
@@ -82,24 +147,6 @@ async def handler_extra_options_except_channel_post(message: Message) -> None:
 SEND_YOUTUBE_LINK_TEXT = '🔗 Give me your YouTube link:'
 
 
-TEXT_EXTRA_OPTIONS = '''<b>🔮 Advanced options:</b> 
-
-    - ✂️ Split by duration
-
-    - 🚦️ Split by timecodes
-
-    - 🎸 Set audio Bitrate
-
-    - ✏️ Get subtitles
-    
-    - 🍰️ Get slice of audio
-    
-    - 🌎️ Translate from any language into Russian
-    
-Select one of the []
-'''
-
-
 @dp.message(Command(commands=TG_EXTRA_OPTIONS_LIST), StateFilter(default_state))
 async def case_show_options(message: types.Message, state: FSMContext):
     logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
@@ -108,7 +155,7 @@ async def case_show_options(message: types.Message, state: FSMContext):
     await bot.send_message(
         chat_id=message.from_user.id,
         reply_to_message_id=None,
-        text=TEXT_EXTRA_OPTIONS,
+        text=f'{DESCRIPTION_BLOCK_EXTRA_OPTIONS}\n\nSelect one of the option:',
         parse_mode='HTML',
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [
@@ -203,6 +250,10 @@ async def case_options(callback_query: types.CallbackQuery, state: FSMContext):
 
     elif action == config.ACTION_NAME_OPTIONS_EXIT:
         await state.clear()
+        await bot.edit_message_text(
+            chat_id=callback_query.from_user.id,
+            message_id=callback_query.message.message_id,
+            text=DESCRIPTION_BLOCK_OKAY_AFTER_EXIT)
 
 
 @dp.callback_query(StateFormMenuExtra.split_by_duration)
@@ -539,11 +590,8 @@ async def run_bot_asynchronously():
     # Say Hello at startup to bot owner by its ID
     if owner_id := os.getenv(config.ENV_TG_BOT_OWNER_ID, ''):
         try:
-            await bot.send_message(
-                chat_id=owner_id,
-                text=config.TEXT_SAY_HELLO_BOT_OWNER_AT_STARTUP.substitute(
-                    package_bot_version=version(config.PACKAGE_NAME),
-                    help_commands_text=config.HELP_COMMANDS_TEXT))
+            await bot.send_message(chat_id=owner_id, text='🟩')
+            await bot.send_message(chat_id=owner_id, text=TEXT_SAY_HELLO_BOT_OWNER_AT_STARTUP)
         except Exception as e:
             logger.error(f'🔴 Error with Say hello. Maybe user id is not valid: \n{e}')
 
