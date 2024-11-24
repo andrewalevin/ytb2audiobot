@@ -57,7 +57,7 @@ class StateFormMenuExtra(StatesGroup):
 DESCRIPTION_BLOCK_WELCOME = f'''
 <b>🪩 Hello!</b>
 (version:  {version(config.PACKAGE_NAME)})
-
+🐐
 I can download .... #todo
  - one
  - two
