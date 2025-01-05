@@ -385,7 +385,7 @@ async def job_downloading(
             audio=FSInputFile(
                 path=segment.get('path'),
                 filename=fname_prefix + fname_title + fname_suffix),
-            duration=segment_duration,
+            duration=segment_duration + 1,
             thumbnail=FSInputFile(path=thumbnail_path) if thumbnail_path is not None else None,
             caption=caption if len(caption) < config.TG_CAPTION_MAX_LONG else trim_caption_to_telegram_send(caption),
             parse_mode='HTML')
