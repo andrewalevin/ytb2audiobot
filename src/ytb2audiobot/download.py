@@ -1,3 +1,4 @@
+import os
 import pathlib
 from typing import Optional, List, Dict
 
@@ -5,9 +6,13 @@ from audio2splitted.audio2splitted import time_format
 from audio2splitted.utils import run_cmds
 from ytbtimecodes.timecodes import standardize_time_format
 
+from ytb2audiobot import config
 from ytb2audiobot.utils import capital2lower, get_short_youtube_url_with_http, timedelta_from_seconds
-from ytb2audiobot.logger import logger
 from ytb2audiobot.utils import run_command
+
+from ytb2audiobot.logger import logger
+DEBUG = False if os.getenv(config.ENV_NAME_DEBUG_MODE, 'false').lower() != 'true' else True
+
 
 
 def get_timecodes_formatted_text(timecodes_dict: Dict[int, Dict], start_time: int = 0) -> str:
@@ -57,21 +62,18 @@ async def make_split_audio_second(audio_path: pathlib.Path, segments: list) -> l
     cmds_list = []
     for idx, segment in enumerate(segments):
         segment_file = audio_path.with_stem(f'{audio_path.stem}-p{idx + 1}-of{len(segments)}')
-        print('💜', segment_file)
+        logger.debug(f'💜 {segment_file}')
         segments[idx]['path'] = segment_file
         cmd = (
             f'ffmpeg -i {audio_path.as_posix()} -ss {time_format(segment['start'])} -to {time_format(segment['end'])} {convert_option} -y {segment_file.as_posix()}')
-        print('💜💜', cmd, type(cmd))
+        logger.debug(f'💜💜 {cmd}, {type(cmd)}')
         cmds_list.append(cmd)
 
-    print('💜 cmds_list: ', cmds_list)
-    print()
+    logger.debug(f'💜 cmds_list: {cmds_list}')
 
     results, all_success = await run_cmds(cmds_list)
-    print('results, all_success', results, all_success)
-    print()
-
-    print("🟢 All Done! Lets see .m4a files and their length")
+    logger.debug(f'results, all_success: {results}, {all_success}')
+    logger.debug("🟢 All Done! Lets see .m4a files and their length")
 
     return segments
 
@@ -171,7 +173,7 @@ async def download_thumbnail_from_download(
     # Log output from command
     if stdout:
         for line in stdout.splitlines():
-            logger.debug(line)
+            logger.debug(f'{line}')
     if stderr:
         for line in stderr.splitlines():
             logger.error(line)
@@ -218,7 +220,7 @@ async def download_audio_from_download(
 
     if stdout:
         for line in stdout.splitlines():
-            logger.debug(line)
+            logger.debug(f'{line}')
     if stderr:
         for line in stderr.splitlines():
             logger.error(line)

@@ -15,7 +15,7 @@ from ytbtimecodes.timecodes import extract_timecodes, timedelta_from_seconds, st
 from ytb2audiobot import config
 from ytb2audiobot.config import get_yt_dlp_options
 from ytb2audiobot.segmentation import segments_verification, get_segments_by_duration, \
-    add_paddings_to_segments, make_magic_tail, get_segments_by_timecodes_from_dict
+    add_paddings_to_segments, make_magic_tail, get_segments_by_timecodes_from_dict, rebalance_segments_long_timecodes
 from ytb2audiobot.subtitles import get_subtitles_here, highlight_words_file_text
 from ytb2audiobot.logger import logger
 from ytb2audiobot.download import download_thumbnail_from_download, \
@@ -28,6 +28,9 @@ from ytb2audiobot.utils import seconds2humanview, capital2lower, \
 
 DEBUG = False if os.getenv(config.ENV_NAME_DEBUG_MODE, 'false').lower() != 'true' else True
 
+REBALANCE_SEGMENTS_TO_FIT_TIMECODES = False if os.getenv(config.ENV_REBALANCE_SEGMENTS_TO_FIT_TIMECODES, 'false').lower() != 'true' else True
+
+logger.info(f'🎆 REBALANCE_SEGMENTS_TO_FIT_TIMECODES: {REBALANCE_SEGMENTS_TO_FIT_TIMECODES}')
 
 async def telegram_send_large_text(send_func, text, max_size=4096, delay=0.5, **kwargs):
     """
@@ -302,22 +305,8 @@ async def job_downloading(
 
     segments = segments_verification(segments, max_segment_duration)
 
-    if not segments:
-        logger.error(f'🔴 No audio segments after processing. It could be internal error.')
-        await info_message.edit_text(f'🔴 Error. No audio segments after processing. It could be internal error.')
-        return
 
-    try:
-        segments = await make_split_audio_second(audio_path, segments)
-    except Exception as e:
-        logger.error(f'🔴 Error during splitting audio by segments.\n\n{e}')
-        await info_message.edit_text(f'🔴 Error during splitting audio by segments.')
-
-    if not segments:
-        logger.error(f'🔴 No audio segments after splitting.')
-        await info_message.edit_text(f'🔴 Error. No audio segments after processing.')
-        return
-
+    # Make head before check rebalance
     caption_head = config.CAPTION_HEAD_TEMPLATE.safe_substitute(
         movieid=movie_id,
         title=capital2lower(title),
@@ -333,6 +322,32 @@ async def job_downloading(
 
     if action == config.ACTION_NAME_TRANSLATE:
         caption_head = '🌎 Translation: \n' + caption_head
+
+    # Check Rebalance by Timecodes
+    if REBALANCE_SEGMENTS_TO_FIT_TIMECODES:
+        segments = rebalance_segments_long_timecodes(
+            segments,
+            config.TG_CAPTION_MAX_LONG - len(caption_head),
+            timecodes_dict,
+            config.SEGMENT_AUDIO_DURATION_SEC)
+
+        segments = add_paddings_to_segments(segments, config.SEGMENT_DUARITION_PADDING_SEC)
+
+    if not segments:
+        logger.error(f'🔴 No audio segments after processing. It could be internal error.')
+        await info_message.edit_text(f'🔴 Error. No audio segments after processing. It could be internal error.')
+        return
+
+    try:
+        segments = await make_split_audio_second(audio_path, segments)
+    except Exception as e:
+        logger.error(f'🔴 Error during splitting audio by segments.\n\n{e}')
+        await info_message.edit_text(f'🔴 Error during splitting audio by segments.')
+
+    if not segments:
+        logger.error(f'🔴 No audio segments after splitting.')
+        await info_message.edit_text(f'🔴 Error. No audio segments after processing.')
+        return
 
     await info_message.edit_text('⌛🚀️ Uploading to Telegram ... ')
 

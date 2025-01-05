@@ -1,3 +1,12 @@
+import os
+import pprint
+import sys
+
+from ytb2audiobot import config
+from ytb2audiobot.download import filter_timecodes_within_bounds, get_timecodes_formatted_text
+from ytb2audiobot.logger import logger
+DEBUG = False if os.getenv(config.ENV_NAME_DEBUG_MODE, 'false').lower() != 'true' else True
+
 
 def segments_verification(segments: list, max_segment_duration: int) -> list:
     # Calculate maximum allowed duration for each segment based on source file size and total duration
@@ -123,4 +132,114 @@ def make_magic_tail(segments: list, max_segment_duration: int) -> list:
         segments[-2]['end'] = segments[-1]['end']
         segments.pop()  # Remove the last segment after merging
 
+
     return segments
+
+
+def rebalance_segments_long_timecodes(
+        segments: list,
+        available_caption_size: int,
+        timecodes_dict: dict,
+        max_audio_len_sec: int = sys.maxsize,
+) -> list:
+    """
+    Rebalance segments based on timecodes and available caption size.
+    """
+    logger.debug('🎆 Rebalance: ')
+    logger.debug(f'🎆 segments: {pprint.pformat(segments)}')
+    logger.debug(f'🎆 timecodes_dict: {pprint.pformat(timecodes_dict)}')
+
+    # Extract start and end times of the original segments
+    full_start = segments[0].get('start')
+    full_end = segments[-1].get('end')
+
+    # Check if rebalance is needed
+    for segment in segments:
+        timecodes_text = get_timecodes_formatted_text(
+            filter_timecodes_within_bounds(
+                timecodes=timecodes_dict,
+                start_time=segment.get('start') + config.SEGMENT_DUARITION_PADDING_SEC,
+                end_time=segment.get('end') - config.SEGMENT_DUARITION_PADDING_SEC - 1),
+            full_start)
+
+        if available_caption_size - len(timecodes_text) < 0:
+            logger.debug('🎆 Make Rebalance: ')
+            break
+    else:
+        return segments
+
+    # Initialize variables for grouping timecodes
+    timecode_groups = []
+    current_group = []
+    current_group_len = 0
+
+    # Group timecodes
+    for time, timecode in timecodes_dict.items():
+        timecode_text = f"00:00:00 - {timecode.get('title')}"
+        proposed_len = current_group_len + len(timecode_text)
+
+        if available_caption_size - proposed_len < 0:
+            timecode_groups.append(current_group)
+            current_group = [time]
+            current_group_len = len(timecode_text)
+            continue
+
+        if current_group and time - current_group[0] > max_audio_len_sec:
+            timecode_groups.append(current_group)
+            current_group = [time]
+            current_group_len = len(timecode_text)
+            continue
+
+        current_group.append(time)
+        current_group_len = proposed_len
+
+    # Add the last group if it exists
+    if current_group:
+        timecode_groups.append(current_group)
+
+
+    # Create new segments from groups
+    new_segments = []
+    for i, group in enumerate(timecode_groups):
+        start_time = group[0]
+        end_time = (
+            timecode_groups[i + 1][0] - 1
+            if i < len(timecode_groups) - 1
+            else full_end
+        )
+
+        new_segments.append({
+            "start": start_time,
+            "end": end_time,
+            "title": ""  # Title can be added dynamically if needed
+        })
+
+        # Check if the last segment can be unified with the second-to-last segment
+    if len(new_segments) > 1:
+        last_segment = new_segments[-1]
+        second_last_segment = new_segments[-2]
+
+        # Get timecodes within the last two segments
+        last_timecodes = filter_timecodes_within_bounds(
+            timecodes=timecodes_dict,
+            start_time=last_segment['start'],
+            end_time=last_segment['end']
+        )
+        second_last_timecodes = filter_timecodes_within_bounds(
+            timecodes=timecodes_dict,
+            start_time=second_last_segment['start'],
+            end_time=second_last_segment['end']
+        )
+
+        # Combine their text lengths
+        combined_text_length = len(get_timecodes_formatted_text(last_timecodes, last_segment['start'])) + \
+                               len(get_timecodes_formatted_text(second_last_timecodes, second_last_segment['start']))
+
+        if combined_text_length <= available_caption_size:
+            # Merge the segments
+            second_last_segment['end'] = last_segment['end']
+            new_segments.pop()  # Remove the last segment
+
+    return new_segments
+
+
