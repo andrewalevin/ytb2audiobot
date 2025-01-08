@@ -56,9 +56,7 @@ dependencies = [
   'ytb2subtitles',
   'log2telegram',
   'humanize',
-  'pydub'
 ]
-
 
 
 [project.optional-dependencies]

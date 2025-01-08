@@ -1,7 +1,7 @@
 import pathlib
 from typing import Optional
 from ytb2audiobot.logger import logger
-from pydub import AudioSegment
+from ytb2audiobot.utils import run_command
 
 
 async def mix_audio_m4a(
@@ -12,29 +12,19 @@ async def mix_audio_m4a(
         bitrate='48k'
 ) -> Optional[pathlib.Path]:
     try:
-        original_audio = AudioSegment.from_file(original_path, format="m4a")
 
-        translated_audio = AudioSegment.from_file(translated_path, format="m4a")
+        command = (
+            f"ffmpeg -i {translated_path.as_posix()} -i {original_path.as_posix()} "
+            f"-vn -filter_complex '[1:a]volume={overlay_volume}[a2];[0:a][a2]amix=inputs=2:duration=shortest' "
+            f"-c:a aac -b:a {bitrate} -y {output_path.as_posix()}"
+        )
 
-        min_length = min(len(original_audio), len(translated_audio))
+        logger.debug(f'🔰COMAMND: {command}')
 
-        original_audio = original_audio[:min_length]
-        translated_audio = translated_audio[:min_length]
+        await run_command(command)
 
-        def map_range(value, old_min, old_max, new_min, new_max):
-            if old_min == old_max:
-                return new_min
-            return new_min + ((value - old_min) / (old_max - old_min)) * (new_max - new_min)
-
-        vol = map_range(overlay_volume, 0.0, 1.0, -60.0, original_audio.dBFS)
-
-        original_audio = original_audio - original_audio.dBFS + vol
-
-        mixed_audio = original_audio.overlay(translated_audio)
-
-        mixed_audio.export(output_path, format="mp4", bitrate=bitrate)
     except Exception as e:
-        logger.error(f'🔴 Error: {e}')
+        logger.error(f'🔴 Error mixing audio: {e}')
         return
 
-    return output_path
+    return pathlib.Path(output_path)

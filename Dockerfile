@@ -21,9 +21,7 @@ RUN npm install -g vot-cli
 
 ENV PYTHONUNBUFFERED=1
 
-RUN pip install --no-cache-dir --upgrade ytb2audiobot>=2025.1.8
-
-RUN pip install --no-cache-dir  pydub
+RUN pip install --no-cache-dir --upgrade ytb2audiobot
 
 COPY docker-runner-bot.sh /app/docker-runner-bot.sh
 
