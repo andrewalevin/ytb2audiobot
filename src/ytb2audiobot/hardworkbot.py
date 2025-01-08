@@ -284,7 +284,6 @@ async def job_downloading(
             await info_message.edit_text(text=f'🔴 Error. Value audio_path_translate_original is None after downloading. Exit.')
             return
 
-
         overlay = configurations.get('overlay')
         logger.debug(f'🔰 OVERLAY={overlay}')
 
