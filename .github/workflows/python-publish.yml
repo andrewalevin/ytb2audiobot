@@ -48,6 +48,9 @@ jobs:
       run: |
         sed -i "s/0.0.0.0.0.0.0.0.1/${VERSION}/g" pyproject.toml
 
+    - name: ⬇️ pydub
+      run: pip install pydub
+    
     - name: 🐍 ⬇️ Python. Install dependencies
       run: pip install build
 
