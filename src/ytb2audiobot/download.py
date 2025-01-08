@@ -142,6 +142,9 @@ def filter_timecodes_within_bounds(timecodes: dict, start_time: int, end_time: i
     return {k: v for k, v in timecodes.items() if start_time <= k <= end_time}
 
 
+async def empty() -> Optional[pathlib.Path]:
+    return
+
 async def download_thumbnail_from_download(
     movie_id: str,
     output_path: pathlib.Path

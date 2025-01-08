@@ -24,7 +24,8 @@ from ytb2audiobot.cron import run_periodically, empty_dir_by_cron
 from ytb2audiobot.hardworkbot import job_downloading, make_subtitles
 from ytb2audiobot.logger import logger
 from ytb2audiobot.slice import time_hhmmss_check_and_convert
-from ytb2audiobot.utils import remove_all_in_dir, get_data_dir, get_big_youtube_move_id, create_inline_keyboard
+from ytb2audiobot.utils import remove_all_in_dir, get_data_dir, get_big_youtube_move_id, create_inline_keyboard, \
+    is_float
 from ytb2audiobot.cron import update_pip_package_ytdlp
 
 load_dotenv()
@@ -487,6 +488,18 @@ def cli_action_parser(text: str):
 
     if matching_attr in config.CLI_ACTIVATION_TRANSLATION:
         action = config.ACTION_NAME_TRANSLATE
+        attributes['overlay'] = config.ACTION_TRANSLATE_OVERLAY_DEFAULT
+
+        parts = text.split(matching_attr)
+        if len(parts) > 1:
+            trans_param = parts[1].strip()
+            if trans_param in config.ACTION_TRANSLATE_GET_SOLO_WORDS:
+                attributes['overlay'] = .0
+
+            if is_float(trans_param):
+                overlay_value = float(trans_param)
+                overlay_value = max(0.0, min(overlay_value, 1.0))
+                attributes['overlay'] = overlay_value
 
     return action, attributes
 
@@ -517,8 +530,10 @@ async def handler_message(message: Message):
     elif cli_action == config.ACTION_NAME_TRANSLATE:
         await job_downloading(
             bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id,
-            message_text=message.text,
-            configurations={'action': config.ACTION_NAME_TRANSLATE})
+            message_text=message.text, configurations={
+                'action': cli_action,
+                'overlay': cli_attributes.get('overlay', config.ACTION_TRANSLATE_OVERLAY_DEFAULT)
+            })
     else:
         logger.debug('🈯 DIRECT MESSAGE: ')
         await job_downloading(
@@ -549,12 +564,6 @@ async def handler_channel_post(message: Message):
         await job_downloading(
             bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id,
             message_text=message.text, configurations={'action': cli_action, 'bitrate': config.ACTION_MUSIC_HIGH_BITRATE})
-        return
-
-    if cli_action == config.ACTION_NAME_TRANSLATE:
-        await job_downloading(
-            bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id,
-            message_text=message.text, configurations={'action': cli_action})
         return
 
     if autodownload_chat_manager.is_chat_id_inside(message.sender_chat.id):

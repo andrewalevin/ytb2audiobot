@@ -438,3 +438,11 @@ def truncate_filename_for_telegram(filename: str) -> str:
     size -= len(ext)
     all = all if len(all) < size else filename[:size]
     return all + ext
+
+
+def is_float(string):
+    try:
+        float(string)
+        return True
+    except ValueError:
+        return False
