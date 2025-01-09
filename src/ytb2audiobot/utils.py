@@ -406,7 +406,7 @@ def predict_downloading_time(duration):
 
 
 def trim_caption_to_telegram_send(text):
-    return text[:config.TG_CAPTION_MAX_LONG - 32] + config.CAPTION_TRIMMED_END_TEXT
+    return text[:config.TELEGRAM_MAX_CAPTION_TEXT_SIZE - 32] + config.CAPTION_TRIMMED_END_TEXT
 
 
 def create_inline_keyboard(rows):

@@ -162,8 +162,8 @@ def rebalance_segments_long_timecodes(
         timecodes_text = get_timecodes_formatted_text(
             filter_timecodes_within_bounds(
                 timecodes=timecodes_dict,
-                start_time=segment.get('start') + config.SEGMENT_DUARITION_PADDING_SEC,
-                end_time=segment.get('end') - config.SEGMENT_DUARITION_PADDING_SEC - 1),
+                start_time=segment.get('start') + config.SEGMENT_DURATION_PADDING_SEC,
+                end_time=segment.get('end') - config.SEGMENT_DURATION_PADDING_SEC - 1),
             full_start)
 
         if available_caption_size - len(timecodes_text) < 0:

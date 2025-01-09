@@ -32,7 +32,7 @@ from ytb2audiobot.utils import remove_all_in_dir, get_data_dir, get_big_youtube_
 from ytb2audiobot.cron import update_pip_package_ytdlp
 
 
-bot = Bot(token=config.DEFAULT_TELEGRAM_TOKEN_IMAGINARY)
+bot = Bot(token=config.TELEGRAM_VALID_TOKEN_IMAGINARY)
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 router = Router()
@@ -551,7 +551,7 @@ async def run_bot_asynchronously():
         run_periodically(600, autodownload_chat_manager.save_hashed_chat_ids, {}))
 
 
-def handle_suspend(signal, frame):
+def handle_suspend(_signal, _frame):
     logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
 
     """Handle the SIGTSTP signal (Ctrl+Z)."""
@@ -560,7 +560,7 @@ def handle_suspend(signal, frame):
     sys.exit(0)
 
 
-def handle_interrupt(signal, frame):
+def handle_interrupt(_signal, _frame):
     logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
 
     """Handle the SIGINT signal (Ctrl+C)."""
@@ -573,7 +573,7 @@ def main():
     signal.signal(signal.SIGINT, handle_interrupt)
     logger.info("Starting ... Press Ctrl+C to stop or Ctrl+Z to suspend.")
 
-    parser = argparse.ArgumentParser(
+    _parser = argparse.ArgumentParser(
         description='🥭 Bot. Youtube to audio telegram bot with subtitles',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
@@ -595,7 +595,7 @@ def main():
     logger.info('🗂 data_dir: ' + f'{data_dir.resolve().as_posix()}')
 
     global bot
-    bot = Bot(token=os.environ.get(config.ENV_NAME_TOKEN, config.DEFAULT_TELEGRAM_TOKEN_IMAGINARY),
+    bot = Bot(token=os.environ.get(config.ENV_NAME_TOKEN, config.TELEGRAM_VALID_TOKEN_IMAGINARY),
               default=DefaultBotProperties(parse_mode='HTML'))
 
     dp.include_router(router)

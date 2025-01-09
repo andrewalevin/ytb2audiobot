@@ -1,52 +1,144 @@
-import logging
-import pathlib
 from string import Template
-from ytb2audio.ytb2audio import YT_DLP_OPTIONS_DEFAULT
-
-# main
-DEV = True
 
 CALLBACK_WAIT_TIMEOUT_SECONDS = 8
 
-KEEP_FILE_TIME_MINUTES_MIN = 5
+AUDIO_SPLIT_THRESHOLD_MINUTES = 101
 
-AUDIO_SPLIT_DELTA_SECONDS_MIN = 0
-AUDIO_SPLIT_DELTA_SECONDS_MAX = 60
+TASK_TIMEOUT_SECONDS = 60 * 30
 
-TELEGRAM_CALLBACK_BUTTON_TIMEOUT_SECONDS_MIN = 2
-TELEGRAM_CALLBACK_BUTTON_TIMEOUT_SECONDS_MAX = 60
+SEGMENT_DURATION_PADDING_SEC = 6
 
-START_COMMAND_TEXT = '''
-<b>🥭 Ytb2audo bot</b>
+SEGMENT_AUDIO_DURATION_SEC = 39 * 60
+SEGMENT_AUDIO_DURATION_SPLIT_THRESHOLD_SEC = 101 * 60
 
-Youtube to audio telegram bot with subtitles
-Description: 
+ACTION_TRANSLATE_OVERLAY_DEFAULT = 0.3
 
-'''
+DATA_DIR_DIRNAME_IN_TEMPDIR = 'pip-ytb2audiobot-data'
+DATA_DIR_NAME = 'data'
 
-SUBTITLES_WITH_CAPTION_TEXT_TEMPLATE = Template('''
-$caption
+ENV_NAME_TOKEN = 'TG_TOKEN'
+ENV_NAME_DEBUG_MODE = 'YTB2AUDIO_DEBUG_MODE'
+ENV_NAME_KEEP_DATA_FILES = 'KEEP_DATA_FILES'
+ENV_TG_BOT_OWNER_ID = 'TG_BOT_OWNER_ID'
+ENV_REBALANCE_SEGMENTS_TO_FIT_TIMECODES = 'REBALANCE_SEGMENTS_TO_FIT_TIMECODES'
 
-$subtitles
-''')
+
+
+
+
+
+TELEGRAM_MAX_CAPTION_TEXT_SIZE = 1024 - 2
 
 TELEGRAM_MAX_MESSAGE_TEXT_SIZE = 4096 - 4
 
+TELEGRAM_MAX_FILE_SIZE_BYTES = 47000000
 
-# processing
+TELEGRAM_VALID_TOKEN_IMAGINARY = '123456789:AAE_O0RiWZRJOeOB8Nn8JWia_uUTqa2bXGU'
 
-SEND_AUDIO_TIMEOUT = 120
-TG_CAPTION_MAX_LONG = 1023
+FORMAT_TEMPLATE = Template('<b><s>$text</s></b>')
+ADDITION_ROWS_NUMBER = 1
+IS_TEXT_FORMATTED = True
 
-AUDIO_SPLIT_THRESHOLD_MINUTES = 101
-AUDIO_SPLIT_DELTA_SECONDS = 5
 
-AUDIO_BITRATE_MIN = 48
-AUDIO_BITRATE_MAX = 320
+# todo
+PACKAGE_NAME = 'ytb2audiobot'
 
-MAX_TELEGRAM_BOT_TEXT_SIZE = 4095
+CALLBACK_DATA_CHARS_SEPARATOR = ':_:'
 
-TASK_TIMEOUT_SECONDS = 60 * 30
+
+# todo
+
+YT_DLP_OPTIONS_DEFAULT = {
+    'extract-audio': True,
+    'audio-format': 'm4a',
+    'audio-quality': '48k',
+    'embed-thumbnail': True,
+    'console-title': True,
+    'embed-metadata': True,
+    'newline': True,
+    'progress-delta': '2',
+    'break-on-existing': True
+}
+
+
+# 255 max - minus additionals
+TG_MAX_FILENAME_LEN = 61
+
+CLI_ACTIVATION_SUBTITLES = ['subtitles', 'subs', 'sub']
+CLI_ACTIVATION_MUSIC = ['music', 'song']
+CLI_ACTIVATION_TRANSLATION = ['translation', 'translate', 'transl', 'trans', 'tran', 'tra', 'tr']
+CLI_ACTIVATION_ALL = CLI_ACTIVATION_SUBTITLES + CLI_ACTIVATION_MUSIC + CLI_ACTIVATION_TRANSLATION
+
+
+ADDITIONAL_CHAPTER_BLOCK = Template('\n\n📌 <b>$title</b>\n[Chapter +${time_shift}]')
+
+
+LOG_FORMAT_CALLED_FUNCTION = Template('💈💈 ${fname}():')
+
+
+CAPTION_SLICE = Template('🍰 Slice from ${start_time} to ${end_time}')
+
+
+SEND_YOUTUBE_LINK_TEXT = '🔗 Give me your YouTube link:'
+
+DESCRIPTION_BLOCK_COMMANDS = f'''
+<b>Commands</b>
+/help
+/extra - 🔮Advanced options
+/autodownload - 🏂‍ (Works only in channels) See about #todo
+'''.strip()
+
+DESCRIPTION_BLOCK_EXTRA_OPTIONS = '''
+<b>🔮 Advanced options:</b> 
+
+ - Split by duration
+ - Split by timecodes
+ - Set audio Bitrate
+ - Get subtitles
+ - Get slice of audio
+ - Translate from any language
+'''.strip()
+
+DESCRIPTION_BLOCK_CLI = f'''
+<b>📟 CLI options</b>
+
+ - one
+ - two
+'''.strip()
+
+
+DESCRIPTION_BLOCK_REFERENCES = f'''
+<b>References</b>
+
+- https://t.me/ytb2audiostartbot (LTS)
+- https://t.me/ytb2audiobetabot (BETA) #todo-all-logs-info
+
+- https://andrewalevin.github.io/ytb2audiobot/
+- https://github.com/andrewalevin/ytb2audiobot
+- https://pypi.org/project/ytb2audiobot/
+- https://hub.docker.com/r/andrewlevin/ytb2audiobot
+'''.strip()
+
+
+DESCRIPTION_BLOCK_OKAY_AFTER_EXIT = f'''
+👋 Okay!
+Anytime you can give me a youtube link to download its audio or select one of the command:
+
+{DESCRIPTION_BLOCK_COMMANDS}
+'''.strip()
+
+BITRATE_VALUES_ROW_ONE = ['48k', '64k', '96k', '128k']
+BITRATE_VALUES_ROW_TWO = ['196k', '256k', '320k']
+BITRATE_VALUES_ALL = BITRATE_VALUES_ROW_ONE + BITRATE_VALUES_ROW_TWO
+
+
+
+SPLIT_DURATION_VALUES_ROW_1 = ['2', '3', '5', '7', '11', '13', '17', '19']
+SPLIT_DURATION_VALUES_ROW_2 = ['23', '29', '31', '37', '41', '43']
+SPLIT_DURATION_VALUES_ROW_3 = ['47', '53', '59', '61', '67']
+SPLIT_DURATION_VALUES_ROW_4 = ['73', '79', '83', '89']
+SPLIT_DURATION_VALUES_ALL = SPLIT_DURATION_VALUES_ROW_1 + SPLIT_DURATION_VALUES_ROW_2 + SPLIT_DURATION_VALUES_ROW_3 + SPLIT_DURATION_VALUES_ROW_4
+
 
 CAPTION_HEAD_TEMPLATE = Template('''
 $partition $title
@@ -57,28 +149,6 @@ $timecodes
 ''')
 
 CAPTION_TRIMMED_END_TEXT = '…\n…\n⚔️ [Text truncated to fit Telegram’s caption limit]'
-
-ADDITIONAL_INFO_FORCED_SPLITTED = '\n\n🎏 [forced splitted due to max orig file size]'
-
-DEFAULT_MOVIE_META = {
-    'id': '',
-    'title': '',
-    'author': '',
-    'description': '',
-    'thumbnail_url': '',
-    'thumbnail_path': None,
-    'additional': '',
-    'duration': 0,
-    'timecodes': [''],
-    'threshold_seconds': AUDIO_SPLIT_THRESHOLD_MINUTES * 60,
-    'split_duration_minutes': 39,
-    'ytdlprewriteoptions': YT_DLP_OPTIONS_DEFAULT,
-    'additional_meta_text': '',
-    'store': pathlib.Path('data')
-}
-
-
-MAX_FILE_SIZE_UPLOADING_TELEGRAM_BOT_BYTES = 3300000
 
 
 COMMANDS_SPLIT = [
@@ -140,61 +210,7 @@ COMMANDS_QUOTE = [
     {'name': 'quote', 'alias': 'q'},
 ]
 
-ALL_COMMANDS = COMMANDS_SPLIT + COMMANDS_BITRATE + COMMANDS_SUBTITLES + COMMANDS_QUOTE
-
 YOUTUBE_DOMAINS = ['youtube.com', 'youtu.be']
-
-PARAMS_MAX_COUNT = 2
-
-DATA_DIR_DIRNAME_IN_TEMPDIR = 'pip-ytb2audiobot-data'
-DATA_DIR_NAME = 'data'
-
-FORMAT_TEMPLATE = Template('<b><s>$text</s></b>')
-ADDITION_ROWS_NUMBER = 1
-IS_TEXT_FORMATTED = True
-
-MOVIES_TEST_TIMCODES = '''
-Как миграция убивает францию
-https://www.youtube.com/watch?v=iR0ETOSis7Y
-
-Ремизов
-youtu.be/iI3qo1Bxi0o 
-
-'''
-
-TELEGRAM_BOT_FILE_MAX_SIZE_BYTES = 47000000
-
-TIMERS_FILE_PATH = pathlib.Path('timers.log')
-
-AUTODOWNLOAD_CHAT_IDS_HASHED_PATH = pathlib.Path('autodownload_chat_ids_hashed.txt')
-
-LOG_LEVEL = logging.DEBUG
-
-DEFAULT_TELEGRAM_TOKEN_IMAGINARY = '123456789:AAE_O0RiWZRJOeOB8Nn8JWia_uUTqa2bXGU'
-
-# Function to set the environment variable
-# config.py
-
-# Function to set the environment variable
-
-PACKAGE_NAME = 'ytb2audiobot'
-
-YOUTUBE_URL = Template('youtu.be/$movieid')
-TIMEOUT_DOWNLOAD_PROCESSING_MULTIPLIRE_BY_PREDICT_TIME = 1
-
-CALLBACK_DATA_CHARS_SEPARATOR = ':_:'
-CALLBACK_SLEEP_TIME_SECONDS = 8
-
-TEXT_STARTED_HEAD = '🚀 Bot has started!'
-
-
-
-def get_thumbnail_path(data_dir, movie_id):
-    return pathlib.Path(data_dir).joinpath(f'{movie_id}-thumbnail.jpg')
-
-
-def get_audio_path(data_dir, movie_id):
-    return pathlib.Path(data_dir).joinpath(f'{movie_id}.m4a')
 
 
 BITRATE_AUDIO_FILENAME_FORMAT_TEMPLATE = Template('-bitrate${bitrate}')
@@ -202,6 +218,8 @@ AUDIO_FILENAME_TEMPLATE = Template('${movie_id}${bitrate}${extension}')
 THUMBNAIL_FILENAME_TEMPLATE = Template('${movie_id}-thumbnail${extension}')
 
 BITRATES_VALUES = ['48k', '64k', '96k', '128k'] + ['196k', '256k', '320k']
+
+ACTION_MUSIC_HIGH_BITRATE = BITRATES_VALUES[-1]
 
 ACTION_NAME_BITRATE_CHANGE = 'bitrate_change'
 ACTION_NAME_SPLIT_BY_TIMECODES = 'split_by_timecodes'
@@ -214,132 +232,3 @@ ACTION_NAME_SLICE = 'slice'
 ACTION_NAME_OPTIONS_EXIT = 'options_exit'
 ACTION_NAME_TRANSLATE = 'translate'
 ACTION_TRANSLATE_GET_SOLO_WORDS = ['solo', 'alone', 'one', 'only']
-ACTION_TRANSLATE_OVERLAY_DEFAULT = 0.3
-
-ENV_NAME_TOKEN = 'TG_TOKEN'
-ENV_NAME_SALT = 'HASH_SALT'
-ENV_NAME_DEBUG_MODE = 'YTB2AUDIO_DEBUG_MODE'
-ENV_NAME_KEEP_DATA_FILES = 'KEEP_DATA_FILES'
-ENV_TG_BOT_OWNER_ID = 'TG_BOT_OWNER_ID'
-ENV_REBALANCE_SEGMENTS_TO_FIT_TIMECODES = 'REBALANCE_SEGMENTS_TO_FIT_TIMECODES'
-
-YT_DLP_OPTIONS_DEFAULT = {
-    'extract-audio': True,
-    'audio-format': 'm4a',
-    'audio-quality': '48k',
-    'embed-thumbnail': True,
-    'console-title': True,
-    'embed-metadata': True,
-    'newline': True,
-    'progress-delta': '2',
-    'break-on-existing': True
-}
-
-
-def get_yt_dlp_options(override_options=None):
-    if override_options is None:
-        override_options = {}
-
-    options = YT_DLP_OPTIONS_DEFAULT
-
-    options.update(override_options)
-
-    rows = []
-
-    for key, value in options.items():
-        if isinstance(value, bool):
-            if value:
-                rows.append(f'--{key}')
-            else:
-                continue
-        else:
-            rows.append(f'--{key} {value}')
-
-    return ' '.join(rows)
-
-
-# 255 max - minus additionals
-TG_MAX_FILENAME_LEN = 61
-
-CLI_ACTIVATION_SUBTITLES = ['subtitles', 'subs', 'sub']
-CLI_ACTIVATION_MUSIC = ['music', 'song']
-CLI_ACTIVATION_TRANSLATION = ['translation', 'translate', 'transl', 'trans', 'tran', 'tra', 'tr']
-CLI_ACTIVATION_ALL = CLI_ACTIVATION_SUBTITLES + CLI_ACTIVATION_MUSIC + CLI_ACTIVATION_TRANSLATION
-
-ACTION_MUSIC_HIGH_BITRATE = BITRATES_VALUES[-1]
-
-ADDITIONAL_CHAPTER_BLOCK = Template('\n\n📌 <b>$title</b>\n[Chapter +${time_shift}]')
-
-SEGMENT_DUARITION_PADDING_SEC = 6
-
-LOG_FORMAT_CALLED_FUNCTION = Template('💈💈 ${fname}():')
-
-
-CAPTION_SLICE = Template('🍰 Slice from ${start_time} to ${end_time}')
-
-YT_DLP_OPTIONS_DEFAULT_2 = ('--extract-audio --audio-format m4a --audio-quality 48k'
-                          ' --embed-thumbnail --console-title --embed-metadata'
-                          ' --newline --progress-delta 2 --break-on-existing')
-
-SEGMENT_AUDIO_DURATION_SEC = 39 * 60
-SEGMENT_AUDIO_DURATION_SPLIT_THRESHOLD_SEC = 101 * 60
-
-
-SEND_YOUTUBE_LINK_TEXT = '🔗 Give me your YouTube link:'
-
-DESCRIPTION_BLOCK_COMMANDS = f'''
-<b>Commands</b>
-/help
-/extra - 🔮Advanced options
-/autodownload - 🏂‍ (Works only in channels) See about #todo
-'''.strip()
-
-DESCRIPTION_BLOCK_EXTRA_OPTIONS = '''
-<b>🔮 Advanced options:</b> 
-
- - Split by duration
- - Split by timecodes
- - Set audio Bitrate
- - Get subtitles
- - Get slice of audio
- - Translate from any language
-'''.strip()
-
-DESCRIPTION_BLOCK_CLI = f'''
-<b>📟 CLI options</b>
-
- - one
- - two
-'''.strip()
-
-
-DESCRIPTION_BLOCK_REFERENCES = f'''
-<b>References</b>
-
-- https://t.me/ytb2audiostartbot (LTS)
-- https://t.me/ytb2audiobetabot (BETA) #todo-all-logs-info
-
-- https://andrewalevin.github.io/ytb2audiobot/
-- https://github.com/andrewalevin/ytb2audiobot
-- https://pypi.org/project/ytb2audiobot/
-- https://hub.docker.com/r/andrewlevin/ytb2audiobot
-'''.strip()
-
-
-DESCRIPTION_BLOCK_OKAY_AFTER_EXIT = f'''
-👋 Okay!
-Anytime you can give me a youtube link to download its audio or select one of the command:
-
-{DESCRIPTION_BLOCK_COMMANDS}
-'''.strip()
-
-BITRATE_VALUES_ROW_ONE = ['48k', '64k', '96k', '128k']
-BITRATE_VALUES_ROW_TWO = ['196k', '256k', '320k']
-BITRATE_VALUES_ALL = BITRATE_VALUES_ROW_ONE + BITRATE_VALUES_ROW_TWO
-
-
-SPLIT_DURATION_VALUES_ROW_1 = ['2', '3', '5', '7', '11', '13', '17', '19']
-SPLIT_DURATION_VALUES_ROW_2 = ['23', '29', '31', '37', '41', '43']
-SPLIT_DURATION_VALUES_ROW_3 = ['47', '53', '59', '61', '67']
-SPLIT_DURATION_VALUES_ROW_4 = ['73', '79', '83', '89']
-SPLIT_DURATION_VALUES_ALL = SPLIT_DURATION_VALUES_ROW_1 + SPLIT_DURATION_VALUES_ROW_2 + SPLIT_DURATION_VALUES_ROW_3 + SPLIT_DURATION_VALUES_ROW_4

@@ -12,7 +12,7 @@ from ytbtimecodes.timecodes import extract_timecodes, timedelta_from_seconds, st
 
 from ytb2audiobot import config
 from ytb2audiobot.audio_mixer import mix_audio_m4a
-from ytb2audiobot.config import get_yt_dlp_options
+from ytb2audiobot.config import YT_DLP_OPTIONS_DEFAULT
 from ytb2audiobot.segmentation import segments_verification, get_segments_by_duration, \
     add_paddings_to_segments, make_magic_tail, get_segments_by_timecodes_from_dict, rebalance_segments_long_timecodes
 from ytb2audiobot.subtitles import get_subtitles_here, highlight_words_file_text
@@ -105,6 +105,29 @@ async def make_subtitles(
                 file=text.encode('utf-8')))
 
     await info_message.delete()
+
+
+def get_yt_dlp_options(override_options=None):
+    if override_options is None:
+        override_options = {}
+
+    options = YT_DLP_OPTIONS_DEFAULT
+
+    options.update(override_options)
+
+    rows = []
+
+    for key, value in options.items():
+        if isinstance(value, bool):
+            if value:
+                rows.append(f'--{key}')
+            else:
+                continue
+        else:
+            rows.append(f'--{key} {value}')
+
+    return ' '.join(rows)
+
 
 
 async def job_downloading(
@@ -251,8 +274,8 @@ async def job_downloading(
             logger.error(f'❌ TimeoutError occurred during download_processing().')
             await info_message.edit_text('❌ TimeoutError occurred during download_processing().')
             return None, None
-        except Exception as e:
-            logger.error(f'❌ Error occurred during download_processing().\n\n{e}')
+        except Exception as err:
+            logger.error(f'❌ Error occurred during download_processing().\n\n{err}')
             await info_message.edit_text('❌ Error occurred during download_processing().')
             return None, None
 
@@ -312,11 +335,11 @@ async def job_downloading(
             total_duration=duration,
             segment_duration=config.SEGMENT_AUDIO_DURATION_SEC)
 
-    segments = add_paddings_to_segments(segments, config.SEGMENT_DUARITION_PADDING_SEC)
+    segments = add_paddings_to_segments(segments, config.SEGMENT_DURATION_PADDING_SEC)
 
     audio_file_size = await get_file_size(audio_path)
 
-    max_segment_duration = int(0.89 * duration * config.TELEGRAM_BOT_FILE_MAX_SIZE_BYTES / audio_file_size)
+    max_segment_duration = int(0.89 * duration * config.TELEGRAM_MAX_FILE_SIZE_BYTES / audio_file_size)
 
     segments = make_magic_tail(segments, max_segment_duration)
 
@@ -344,11 +367,11 @@ async def job_downloading(
     if REBALANCE_SEGMENTS_TO_FIT_TIMECODES:
         segments = rebalance_segments_long_timecodes(
             segments,
-            config.TG_CAPTION_MAX_LONG - len(caption_head),
+            config.TELEGRAM_MAX_CAPTION_TEXT_SIZE - len(caption_head),
             timecodes_dict,
             config.SEGMENT_AUDIO_DURATION_SEC)
 
-        segments = add_paddings_to_segments(segments, config.SEGMENT_DUARITION_PADDING_SEC)
+        segments = add_paddings_to_segments(segments, config.SEGMENT_DURATION_PADDING_SEC)
 
     if not segments:
         logger.error(f'❌ No audio segments found after processing. This could be an internal error.')
@@ -372,7 +395,7 @@ async def job_downloading(
         start = segment.get('start')
         end = segment.get('end')
         filtered_timecodes_dict = filter_timecodes_within_bounds(
-            timecodes=timecodes_dict, start_time=start + config.SEGMENT_DUARITION_PADDING_SEC, end_time=end - config.SEGMENT_DUARITION_PADDING_SEC - 1)
+            timecodes=timecodes_dict, start_time=start + config.SEGMENT_DURATION_PADDING_SEC, end_time=end - config.SEGMENT_DURATION_PADDING_SEC - 1)
         timecodes_text = get_timecodes_formatted_text(filtered_timecodes_dict, start)
 
         if segment.get('title'):
@@ -403,7 +426,7 @@ async def job_downloading(
                 filename=fname_prefix + fname_title + fname_suffix),
             duration=segment_duration + 1,
             thumbnail=FSInputFile(path=thumbnail_path) if thumbnail_path is not None else None,
-            caption=caption if len(caption) < config.TG_CAPTION_MAX_LONG else trim_caption_to_telegram_send(caption),
+            caption=caption if len(caption) < config.TELEGRAM_MAX_CAPTION_TEXT_SIZE else trim_caption_to_telegram_send(caption),
             parse_mode='HTML')
 
         # Sleep to avoid flood in Telegram API
