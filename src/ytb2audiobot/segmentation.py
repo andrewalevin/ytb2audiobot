@@ -99,6 +99,8 @@ def get_segments_by_duration(total_duration: int, segment_duration: int) -> list
 
 
 def add_paddings_to_segments(input_segments: list, padding_duration: int) -> list:
+
+    # todo
     MAX_PADDING_DURATION = 60 * 5
     padding_duration = max(0, min(padding_duration, MAX_PADDING_DURATION))
 
@@ -145,9 +147,11 @@ def rebalance_segments_long_timecodes(
     """
     Rebalance segments based on timecodes and available caption size.
     """
-    logger.debug('🎆 Rebalance: ')
-    logger.debug(f'🎆 segments: {pprint.pformat(segments)}')
-    logger.debug(f'🎆 timecodes_dict: {pprint.pformat(timecodes_dict)}')
+
+    # todo
+    logger.debug('🎆 Rebalance process started:')
+    logger.debug(f'🎆 Segments: {pprint.pformat(segments)}')
+    logger.debug(f'🎆 Timecodes dictionary: {pprint.pformat(timecodes_dict)}')
 
     # Extract start and end times of the original segments
     full_start = segments[0].get('start')
@@ -163,7 +167,7 @@ def rebalance_segments_long_timecodes(
             full_start)
 
         if available_caption_size - len(timecodes_text) < 0:
-            logger.debug('🎆 Make Rebalance: ')
+            logger.debug('🎆 Starting Rebalance process:')
             break
     else:
         return segments

@@ -4,7 +4,16 @@ from ytb2audiobot import config
 
 
 def highlight_words_file_text(text: str, word: str) -> str:
-    return text.replace('<b><s><b><s>', ' 🔹 ').replace(f'{word}</s></b></s></b>', f'{word.upper()}').replace('  ', ' ')
+    # Replace unwanted repeated tags with a more readable marker
+    text = text.replace('<b><s><b><s>', ' 🔹 ')
+
+    # Ensure proper formatting of the target word by converting it to uppercase
+    text = text.replace(f'{word}</s></b></s></b>', f'{word.upper()}')
+
+    # Remove extra spaces between words
+    text = text.replace('  ', ' ')
+
+    return text
 
 
 def get_answer_text(subtitles, selected_index=None):

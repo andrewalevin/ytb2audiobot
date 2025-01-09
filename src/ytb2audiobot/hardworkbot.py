@@ -28,7 +28,7 @@ from ytb2audiobot.utils import seconds2humanview, capital2lower, \
 DEBUG = False if os.getenv(config.ENV_NAME_DEBUG_MODE, 'false').lower() != 'true' else True
 
 REBALANCE_SEGMENTS_TO_FIT_TIMECODES = False if os.getenv(config.ENV_REBALANCE_SEGMENTS_TO_FIT_TIMECODES, 'false').lower() != 'true' else True
-
+# todo
 logger.info(f'🎆 REBALANCE_SEGMENTS_TO_FIT_TIMECODES: {REBALANCE_SEGMENTS_TO_FIT_TIMECODES}')
 
 async def telegram_send_large_text(send_func, text, max_size=4096, delay=0.5, **kwargs):
@@ -56,7 +56,7 @@ async def telegram_send_large_text(send_func, text, max_size=4096, delay=0.5, **
 
 
 async def handle_error(e: Exception, info_message: Message, notice: str):
-    text = f'🔴 {notice}\n\n{e}'
+    text = f'❌ {notice}\n\n{e}'
     logger.error(text)
     await telegram_send_large_text(info_message, text)
 
@@ -71,16 +71,16 @@ async def make_subtitles(
     info_message = await bot.edit_message_text(
         chat_id=sender_id,
         message_id=editable_message_id,
-        text='⏳ Getting ready …'
+        text = '⏳ Preparing...'
     ) if editable_message_id else await bot.send_message(
         chat_id=sender_id,
         reply_to_message_id=reply_message_id,
-        text='⏳ Getting ready …')
+        text = '⏳ Preparing...')
 
-    info_message = await info_message.edit_text(text='⏳ Fetching subtitles …')
+    info_message = await info_message.edit_text('⏳ Fetching subtitles...')
 
     if not (movie_id := get_big_youtube_move_id(url)):
-        await info_message.edit_text('🔴 Can t get valid youtube movie id out of your url')
+        await info_message.edit_text('❌ Unable to extract a valid YouTube movie ID from the provided URL.')
         return
 
     text = await get_subtitles_here(url, word)
@@ -118,7 +118,7 @@ async def job_downloading(
         configurations = {}
 
     logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
-    logger.debug(f'💹 Configurations Started: {configurations}')
+    logger.debug(f'💹 Configurations have started: {configurations}')
 
     movie_id = get_big_youtube_move_id(message_text)
     if not movie_id:
@@ -128,10 +128,10 @@ async def job_downloading(
     info_message = await bot.edit_message_text(
         chat_id=sender_id,
         message_id=info_message_id,
-        text='⏳ Getting ready …'
+        text='⏳ Preparing...'
     ) if info_message_id else await bot.send_message(
         chat_id=sender_id,
-        text='⏳ Getting ready …')
+        text='⏳ Preparing...')
 
     ydl_opts = {
         'logtostderr': False,  # Avoids logging to stderr, logs to the logger instead
@@ -144,27 +144,24 @@ async def job_downloading(
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             yt_info = ydl.extract_info(f"https://www.youtube.com/watch?v={movie_id}", download=False)
     except Exception as e:
-        logger.error(f'🔴 Cant Extract YT_DLP info. \n\n{e}')
-        await info_message.edit_text(f'🔴 Cant Extract YT_DLP info about this movie.')
+        logger.error(f'❌ Unable to extract YT-DLP info. \n\n{e}')
+        await info_message.edit_text('❌ Unable to extract YT-DLP info for this movie.')
         return
 
     if yt_info.get('is_live'):
-        await info_message.edit_text(
-            text='❌🎬💃 This movie video is now live and unavailable for download. Please try again later')
+        await info_message.edit_text('❌🎬💃 This movie is now live and unavailable for download. Please try again later.')
         return
 
     if not yt_info.get('title') or not yt_info.get('duration'):
-        await info_message.edit_text('❌🎬💔 No title or duration info of this video.')
+        await info_message.edit_text('❌🎬💔 No title or duration information available for this video.')
         return
 
     if not yt_info.get('filesize_approx', ''):
-        await info_message.edit_text(
-            text='❌🛰 This movie video is now live but perhapse in processes of changing. Try again later')
+        await info_message.edit_text('❌🛰 This movie is currently live, but it may be in the process of being updated. Please try again later.')
         return
 
     if not any(format_item.get('filesize') is not None for format_item in yt_info.get('formats', [])):
-        await info_message.edit_text(
-            text='❌🎬🤔 Audio file for this video is unavailable for an unknown reason.')
+        await info_message.edit_text('❌🎬🤔 The audio file for this video is unavailable due to an unknown reason.')
         return
 
     action = configurations.get('action', '')
@@ -173,16 +170,16 @@ async def job_downloading(
         language = yt_info.get('language', '')
         if language == 'ru':
             await info_message.edit_text(
-                text=f'🌎🚫 This movie is still in Russian. You can download its audio directly. '
-                     f'Please give its URL again: ')
+                '🌎🚫 This movie is still in Russian. You can download its audio directly. '
+                'Please provide its URL again:')
             return
 
         # todo time
-        info_message = await info_message.edit_text(text=f'⏳ 🌎Translation is starting. It could takes some time ... ')
+        info_message = await info_message.edit_text('⏳🌎 Translation is starting. It may take some time...')
 
     else:
         predict_time = predict_downloading_time(yt_info.get('duration'))
-        info_message = await info_message.edit_text(text=f'⏳ Downloading ~ {seconds2humanview(predict_time)} ... ')
+        info_message = await info_message.edit_text(f'⏳ Downloading ~ {seconds2humanview(predict_time)}...')
 
     title = yt_info.get('title', '')
     description = yt_info.get('description', '')
@@ -200,8 +197,8 @@ async def job_downloading(
 
     yt_dlp_options = get_yt_dlp_options()
 
-    logger.debug(f'🈺 action = {action}\n\n')
-    logger.debug(f'🈴 yt_dlp_options = {yt_dlp_options}\n\n')
+    logger.debug(f'🈺 Action: {action}\n\n')
+    logger.debug(f'🈴 yt-dlp options: {yt_dlp_options}\n\n')
 
     bitrate = '48k'
 
@@ -225,9 +222,8 @@ async def job_downloading(
         end_time_hhmmss = standardize_time_format(timedelta_from_seconds(end_time))
 
         yt_dlp_options += f' --postprocessor-args \"-ss {start_time_hhmmss} -t {end_time_hhmmss}\"'
-        print(f'🍰 Slice yt_dlp_options = {yt_dlp_options}')
 
-    logger.debug(f'🈴🈴 yt_dlp_options = {yt_dlp_options}\n\n')
+    logger.debug(f'🈴🈴 yt-dlp options: {yt_dlp_options}\n\n')
 
     # Run tasks with timeout
     async def handle_download():
@@ -252,25 +248,25 @@ async def job_downloading(
 
             return result
         except asyncio.TimeoutError:
-            logger.error(f'🔴 TimeoutError. During download_processing().')
-            await info_message.edit_text(text='🔴 TimeoutError. During download_processing().')
+            logger.error(f'❌ TimeoutError occurred during download_processing().')
+            await info_message.edit_text('❌ TimeoutError occurred during download_processing().')
             return None, None
         except Exception as e:
-            logger.error(f'🔴 Error during download_processing().\n\n{e}')
-            await info_message.edit_text(text=f'🔴 Error during download_processing().')
+            logger.error(f'❌ Error occurred during download_processing().\n\n{e}')
+            await info_message.edit_text('❌ Error occurred during download_processing().')
             return None, None
 
     audio_path, thumbnail_path, audio_path_translate_original = await handle_download()
     logger.debug(f'audio_path={audio_path}, thumbnail_pat={thumbnail_path}, audio_path_translate_original={audio_path_translate_original}')
     if audio_path is None:
-        logger.error(f'🔴 audio_path is None after downloading. Exit.')
-        await info_message.edit_text(text=f'🔴 Error. Value audio_path is None after downloading. Exit.')
+        logger.error(f'❌ audio_path is None after downloading. Exiting.')
+        await info_message.edit_text('❌ Error: audio_path is None after downloading. Exiting.')
         return
 
     audio_path = pathlib.Path(audio_path)
     if not audio_path.exists():
-        logger.error(f'🔴 not audio_path.exists() after downloading. Exit.')
-        await info_message.edit_text(text=f'🔴 Error. Value audio_path not exists after downloading. Exit.')
+        logger.error(f'❌ audio_path does not exist after downloading. Exiting.')
+        await info_message.edit_text('❌ Error: audio_path does not exist after downloading. Exiting.')
         return
 
     if thumbnail_path is not None:
@@ -280,12 +276,9 @@ async def job_downloading(
 
     if action == config.ACTION_NAME_TRANSLATE:
         if audio_path_translate_original is None:
-            logger.error(f'🔴 audio_path_translate_original is None after downloading. Exit.')
-            await info_message.edit_text(text=f'🔴 Error. Value audio_path_translate_original is None after downloading. Exit.')
+            logger.error(f'❌ audio_path_translate_original is None after downloading. Exiting.')
+            await info_message.edit_text('❌ Error: audio_path_translate_original is None after downloading. Exiting.')
             return
-
-        overlay = configurations.get('overlay')
-        logger.debug(f'🔰 OVERLAY={overlay}')
 
         if configurations.get('overlay') == 0.0:
             audio_path = audio_path_translate_original
@@ -296,8 +289,8 @@ async def job_downloading(
             )
 
             if not audio_path_translate_final or not audio_path_translate_final.exists():
-                logger.error(f'🔴 not audio_path_translate_final.exists() after downloading. Exit.')
-                await info_message.edit_text(text=f'🔴 Error. Value audio_path not exists after downloading. Exit.')
+                logger.error(f'❌ audio_path_translate_final does not exist after downloading. Exiting.')
+                await info_message.edit_text('❌ Error: audio_path_translate_final does not exist after downloading. Exiting.')
                 return
 
             audio_path = audio_path_translate_final
@@ -358,25 +351,24 @@ async def job_downloading(
         segments = add_paddings_to_segments(segments, config.SEGMENT_DUARITION_PADDING_SEC)
 
     if not segments:
-        logger.error(f'🔴 No audio segments after processing. It could be internal error.')
-        await info_message.edit_text(f'🔴 Error. No audio segments after processing. It could be internal error.')
+        logger.error(f'❌ No audio segments found after processing. This could be an internal error.')
+        await info_message.edit_text(f'❌ Error: No audio segments found after processing. This could be an internal error.')
         return
 
     try:
         segments = await make_split_audio_second(audio_path, segments)
     except Exception as e:
-        logger.error(f'🔴 Error during splitting audio by segments.\n\n{e}')
-        await info_message.edit_text(f'🔴 Error during splitting audio by segments.')
-
+        logger.error(f'❌ Error occurred while splitting audio into segments: {e}')
+        await info_message.edit_text(f'❌ Error: Failed to split audio into segments.')
     if not segments:
-        logger.error(f'🔴 No audio segments after splitting.')
-        await info_message.edit_text(f'🔴 Error. No audio segments after processing.')
+        logger.error(f'❌ No audio segments found after splitting.')
+        await info_message.edit_text(f'❌ Error: No audio segments found after processing.')
         return
 
-    await info_message.edit_text('⌛🚀️ Uploading to Telegram ... ')
+    await info_message.edit_text('⌛🚀 Uploading to Telegram...')
 
     for idx, segment in enumerate(segments):
-        logger.info(f'💚 Uploading audio item: ' + str(segment.get('audio_path')))
+        logger.info(f'💚 Uploading audio item: {segment.get("audio_path")}')
         start = segment.get('start')
         end = segment.get('end')
         filtered_timecodes_dict = filter_timecodes_within_bounds(
@@ -417,8 +409,8 @@ async def job_downloading(
         # Sleep to avoid flood in Telegram API
         if idx < len(segments) - 1:
             sleep_duration = math.floor(8 * math.log10(len(segments) + 1))
-            logger.debug(f'💤😴 Sleep sleep_duration={sleep_duration}')
+            logger.debug(f'💤😴 Sleeping for {sleep_duration} seconds.')
             await asyncio.sleep(sleep_duration)
 
     await info_message.delete()
-    logger.info(f'💚💚 Done! ')
+    logger.info('💚💚 Done!')

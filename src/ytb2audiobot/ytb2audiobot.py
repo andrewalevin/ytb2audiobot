@@ -6,7 +6,6 @@ import asyncio
 import signal
 import sys
 
-from dotenv import load_dotenv
 from importlib.metadata import version
 
 from aiogram import Bot, Dispatcher, types, Router
@@ -20,6 +19,10 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from ytb2audiobot import config
 from ytb2audiobot.autodownload_chat_manager import AutodownloadChatManager
 from ytb2audiobot.callback_storage_manager import StorageCallbackManager
+from ytb2audiobot.config import SEND_YOUTUBE_LINK_TEXT, DESCRIPTION_BLOCK_COMMANDS, DESCRIPTION_BLOCK_EXTRA_OPTIONS, \
+    DESCRIPTION_BLOCK_CLI, DESCRIPTION_BLOCK_REFERENCES, DESCRIPTION_BLOCK_OKAY_AFTER_EXIT, SPLIT_DURATION_VALUES_ROW_1, \
+    SPLIT_DURATION_VALUES_ROW_2, SPLIT_DURATION_VALUES_ROW_3, SPLIT_DURATION_VALUES_ROW_4, BITRATE_VALUES_ROW_ONE, \
+    BITRATE_VALUES_ROW_TWO, SPLIT_DURATION_VALUES_ALL, BITRATE_VALUES_ALL
 from ytb2audiobot.cron import run_periodically, empty_dir_by_cron
 from ytb2audiobot.hardworkbot import job_downloading, make_subtitles
 from ytb2audiobot.logger import logger
@@ -28,7 +31,6 @@ from ytb2audiobot.utils import remove_all_in_dir, get_data_dir, get_big_youtube_
     is_float
 from ytb2audiobot.cron import update_pip_package_ytdlp
 
-load_dotenv()
 
 bot = Bot(token=config.DEFAULT_TELEGRAM_TOKEN_IMAGINARY)
 storage = MemoryStorage()
@@ -37,7 +39,6 @@ router = Router()
 
 data_dir = get_data_dir()
 
-# Example usage
 callback_storage_manager = StorageCallbackManager()
 
 autodownload_chat_manager = AutodownloadChatManager(data_dir=data_dir)
@@ -64,44 +65,6 @@ I can download .... #todo
  - two
 '''.strip()
 
-DESCRIPTION_BLOCK_COMMANDS = f'''
-<b>Commands</b>
-/help
-/extra - 🔮Advanced options
-/autodownload - 🏂‍ (Works only in channels) See about #todo
-'''.strip()
-
-DESCRIPTION_BLOCK_EXTRA_OPTIONS = '''
-<b>🔮 Advanced options:</b> 
-
- - Split by duration
- - Split by timecodes
- - Set audio Bitrate
- - Get subtitles
- - Get slice of audio
- - Translate from any language
-'''.strip()
-
-DESCRIPTION_BLOCK_CLI = f'''
-<b>📟 CLI options</b>
-
- - one
- - two
-'''.strip()
-
-
-DESCRIPTION_BLOCK_REFERENCES = f'''
-<b>References</b>
-
-- https://t.me/ytb2audiostartbot (LTS)
-- https://t.me/ytb2audiobetabot (BETA) #todo-all-logs-info
-
-- https://andrewalevin.github.io/ytb2audiobot/
-- https://github.com/andrewalevin/ytb2audiobot
-- https://pypi.org/project/ytb2audiobot/
-- https://hub.docker.com/r/andrewlevin/ytb2audiobot
-'''.strip()
-
 START_AND_HELP_TEXT = f'''
 {DESCRIPTION_BLOCK_WELCOME}
 
@@ -123,14 +86,6 @@ TEXT_SAY_HELLO_BOT_OWNER_AT_STARTUP = f'''
 '''.strip()
 
 
-DESCRIPTION_BLOCK_OKAY_AFTER_EXIT = f'''
-👋 Okay!
-Anytime you can give me a youtube link to download its audio or select one of the command:
-
-{DESCRIPTION_BLOCK_COMMANDS}
-'''.strip()
-
-
 @dp.message(CommandStart())
 @dp.message(Command('help'))
 async def handler_command_start_and_help(message: Message) -> None:
@@ -140,16 +95,11 @@ async def handler_command_start_and_help(message: Message) -> None:
 
 
 TG_EXTRA_OPTIONS_LIST = ['extra', 'options', 'advanced', 'ext', 'ex', 'opt', 'op', 'adv', 'ad']
-
-
 @dp.channel_post(Command(commands=TG_EXTRA_OPTIONS_LIST))
 async def handler_extra_options_except_channel_post(message: Message) -> None:
     logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
 
     await message.answer('❌ This command works only in bot not in channels.')
-
-
-SEND_YOUTUBE_LINK_TEXT = '🔗 Give me your YouTube link:'
 
 
 @dp.message(Command(commands=TG_EXTRA_OPTIONS_LIST), StateFilter(default_state))
@@ -174,18 +124,6 @@ async def case_show_options(message: types.Message, state: FSMContext):
                 InlineKeyboardButton(text='🌎 Translate', callback_data=config.ACTION_NAME_TRANSLATE)],
             [
                 InlineKeyboardButton(text='🔚 Exit', callback_data=config.ACTION_NAME_OPTIONS_EXIT)],]))
-
-
-BITRATE_VALUES_ROW_ONE = ['48k', '64k', '96k', '128k']
-BITRATE_VALUES_ROW_TWO = ['196k', '256k', '320k']
-BITRATE_VALUES_ALL = BITRATE_VALUES_ROW_ONE + BITRATE_VALUES_ROW_TWO
-
-
-SPLIT_DURATION_VALUES_ROW_1 = ['2', '3', '5', '7', '11', '13', '17', '19']
-SPLIT_DURATION_VALUES_ROW_2 = ['23', '29', '31', '37', '41', '43']
-SPLIT_DURATION_VALUES_ROW_3 = ['47', '53', '59', '61', '67']
-SPLIT_DURATION_VALUES_ROW_4 = ['73', '79', '83', '89']
-SPLIT_DURATION_VALUES_ALL = SPLIT_DURATION_VALUES_ROW_1 + SPLIT_DURATION_VALUES_ROW_2 + SPLIT_DURATION_VALUES_ROW_3 + SPLIT_DURATION_VALUES_ROW_4
 
 
 @dp.callback_query(StateFormMenuExtra.options)
@@ -267,8 +205,7 @@ async def case_split_by_duration_processing(callback_query: types.CallbackQuery,
 
     split_duration = callback_query.data
     if split_duration not in SPLIT_DURATION_VALUES_ALL:
-        await bot.edit_message_text(
-            text=f'🔴 An unexpected unknown split duration value was received. (split_duration={split_duration})')
+        await bot.edit_message_text(f'❌ An unexpected unknown split duration value was received. (split_duration={split_duration})')
         await state.clear()
 
     await state.update_data(split_duration=split_duration)
@@ -284,8 +221,7 @@ async def case_bitrate_processing(callback_query: types.CallbackQuery, state: FS
 
     bitrate = callback_query.data
     if bitrate not in BITRATE_VALUES_ALL:
-        await bot.edit_message_text(
-            text=f'🔴 An unexpected unknown bitrate value was received. (bitrate={bitrate})')
+        await bot.edit_message_text(f'❌ An unexpected unknown bitrate value was received. (bitrate={bitrate})')
         await state.clear()
 
     await state.update_data(bitrate=bitrate)
@@ -333,11 +269,11 @@ async def case_slice_start_time(message: types.Message, state: FSMContext):
     start_time = time_hhmmss_check_and_convert(start_time)
     if start_time is None:
         await state.clear()
-        await message.answer(text=f'❌ Not valid time format. Try again')
+        await message.answer(f'❌ Not valid time format. Try again')
 
     await state.update_data(slice_start_time=start_time)
-    await message.answer(text=f'🍰 Step 2/2. Now give me an END time  of your slice. \n'
-                              f'In format 01:02:03. (hh:mm:ss) or 02:02 (mm:ss) 78 seconds')
+    await message.answer(f'🍰 Step 2/2. Now give me an END time  of your slice. \n'
+                         f'In format 01:02:03. (hh:mm:ss) or 02:02 (mm:ss) 78 seconds')
     await state.set_state(StateFormMenuExtra.slice_end_time)
 
 
@@ -349,13 +285,13 @@ async def case_slice_start_time(message: types.Message, state: FSMContext):
     end_time = time_hhmmss_check_and_convert(end_time)
     if end_time is None:
         await state.clear()
-        await message.answer(text=f'❌ Not valid time format. Try again')
+        await message.answer(f'❌ Not valid time format. Try again')
 
     data = await state.get_data()
     start_time = int(data.get('slice_start_time', ''))
     if start_time >= end_time:
         await state.clear()
-        await message.answer(text=f'❌ Start time should be less then end time. Try again')
+        await message.answer(f'❌ Start time should be less then end time. Try again')
 
     await state.update_data(slice_end_time=end_time)
     await message.answer(text=SEND_YOUTUBE_LINK_TEXT)
@@ -371,8 +307,7 @@ async def case_url(message: Message, state: FSMContext) -> None:
     await state.clear()
 
     if not get_big_youtube_move_id(url):
-        await message.answer(
-            text=f'🔴 Unable to extract a valid YouTube URL from your input. (url={url})')
+        await message.answer(f'❌ Unable to extract a valid YouTube URL from your input. (url={url})')
         return
 
     action = data.get('action', '')
@@ -433,8 +368,7 @@ async def handler_autodownload_switch_state(message: types.Message) -> None:
 async def handler_autodownload_command_in_bot(message: types.Message) -> None:
     logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
 
-    await message.answer(
-        text='❌ This command works only in Channels. Add this bot to the list of admins and call it call then')
+    await message.answer('❌ This command works only in Channels. Add this bot to the list of admins and call it call then')
 
 
 @dp.callback_query(lambda c: c.data.startswith('download:'))
@@ -466,11 +400,9 @@ def cli_action_parser(text: str):
 
     matching_attr = next((attr for attr in config.CLI_ACTIVATION_ALL if attr in text), None)
 
-    logger.debug(f'🌀 cli_action_parser: 1 matching_attr={matching_attr}')
     if matching_attr is None:
         return action, attributes
 
-    logger.debug(f'🌀 cli_action_parser: 4 matching_attr={matching_attr}')
     if matching_attr in config.CLI_ACTIVATION_SUBTITLES:
         action = config.ACTION_NAME_SUBTITLES_GET_ALL
 
@@ -606,7 +538,7 @@ async def run_bot_asynchronously():
             await bot.send_message(chat_id=owner_id, text='🟩')
             await bot.send_message(chat_id=owner_id, text=TEXT_SAY_HELLO_BOT_OWNER_AT_STARTUP)
         except Exception as e:
-            logger.error(f'🔴 Error with Say hello. Maybe user id is not valid: \n{e}')
+            logger.error(f'❌ Error with Say hello. Maybe user id is not valid: \n{e}')
 
     if os.environ.get('KEEP_DATA_FILES', 'false').lower() != 'true':
         logger.info('♻️🗑 Remove last files in DATA')
@@ -652,12 +584,12 @@ def main():
         os.environ[config.ENV_NAME_KEEP_DATA_FILES] = 'true'
 
     if not os.getenv(config.ENV_NAME_TOKEN, ''):
-        logger.error('🔴 No TG_TOKEN variable set in env. Make add and restart bot.')
+        logger.error('❌ No TG_TOKEN variable set in env. Make add and restart bot.')
         return
 
     # todo add salt to use it
     if not os.getenv(config.ENV_NAME_TOKEN, ''):
-        logger.error('🔴 No HASH_SALT variable set in .env. Make add any random hash with key SALT!')
+        logger.error('❌ No HASH_SALT variable set in .env. Make add any random hash with key SALT!')
         return
 
     logger.info('🗂 data_dir: ' + f'{data_dir.resolve().as_posix()}')

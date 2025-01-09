@@ -41,7 +41,7 @@ def get_timecodes_formatted_text(timecodes_dict: Dict[int, Dict], start_time: in
             title = capital2lower(value.get('title', 'Untitled'))
             formatted_timecodes.append(f"{_time} - {title}")
         except Exception as e:
-            logger.error(f"🔴 Error processing timecode at {time}: {e}")
+            logger.error(f"❌ Error processing timecode at {time}: {e}")
             continue
 
     return '\n'.join(formatted_timecodes)
@@ -62,18 +62,18 @@ async def make_split_audio_second(audio_path: pathlib.Path, segments: list) -> l
     cmds_list = []
     for idx, segment in enumerate(segments):
         segment_file = audio_path.with_stem(f'{audio_path.stem}-p{idx + 1}-of{len(segments)}')
-        logger.debug(f'💜 {segment_file}')
+        logger.debug(f'💜 Segment file: {segment_file}')
         segments[idx]['path'] = segment_file
         cmd = (
             f'ffmpeg -i {audio_path.as_posix()} -ss {time_format(segment['start'])} -to {time_format(segment['end'])} {convert_option} -y {segment_file.as_posix()}')
-        logger.debug(f'💜💜 {cmd}, {type(cmd)}')
+        logger.debug(f'💜💜 FFmpeg command: {cmd}, Type: {type(cmd)}')
         cmds_list.append(cmd)
 
-    logger.debug(f'💜 cmds_list: {cmds_list}')
+    logger.debug(f'💜 Commands list (total {len(cmds_list)}): {cmds_list}')
 
     results, all_success = await run_cmds(cmds_list)
-    logger.debug(f'results, all_success: {results}, {all_success}')
-    logger.debug("🟢 All Done! Lets see .m4a files and their length")
+    logger.debug(f'💬 Results: {results}, All success: {all_success}')
+    logger.debug("🟢 All done! Now, let's check the .m4a files and their lengths.")
 
     return segments
 
@@ -161,7 +161,7 @@ async def download_thumbnail_from_download(
     """
     output_path = pathlib.Path(output_path)
     if output_path.exists():
-        logger.info(f"🌅 Thumbnail already exists at {output_path}")
+        logger.info(f"🌅 Thumbnail already exists at: {output_path}")
         return output_path
 
     url = get_short_youtube_url_with_http(movie_id)
@@ -170,7 +170,7 @@ async def download_thumbnail_from_download(
         f'yt-dlp --write-thumbnail --skip-download --convert-thumbnails jpg '
         f'--output "{output_path.with_suffix('').as_posix()}" {url}')
 
-    logger.debug(f"🌅🔰 Running thumbnail download command: {command}")
+    logger.debug(f"🌅🔰 Executing thumbnail download command: {command}")
     stdout, stderr, return_code = await run_command(command)
 
     # Log output from command
@@ -183,14 +183,14 @@ async def download_thumbnail_from_download(
 
     # Error and file existence checks
     if return_code != 0:
-        logger.error(f"🌅 Thumbnail download failed for movie ID: {movie_id} with return code {return_code}")
+        logger.error(f"❌🌅 Thumbnail download failed for Movie ID: {movie_id}. Return code: {return_code}")
         return None
 
     if not output_path.exists():
-        logger.error(f"🌅 Thumbnail file not found at {output_path.with_suffix('.jpg')}")
+        logger.error(f"❌🌅 Thumbnail file not found at: {output_path.with_suffix('.jpg')}")
         return None
 
-    logger.info(f"🌅 Thumbnail successfully downloaded at {output_path.as_posix()}")
+    logger.info(f"🌅 Thumbnail successfully downloaded to: {output_path.as_posix()}")
     return output_path
 
 
@@ -211,7 +211,7 @@ async def download_audio_from_download(
     """
     output_path = pathlib.Path(output_path)
     if output_path.exists():
-        logger.info(f"📣 Audio file already exists at {output_path}")
+        logger.info(f"📣 Audio file already exists at: {output_path}")
         return output_path
 
     url = get_short_youtube_url_with_http(movie_id)
@@ -230,10 +230,10 @@ async def download_audio_from_download(
 
     # Check for errors or missing file
     if return_code != 0:
-        logger.error(f"📣 Download failed with return code {return_code}")
+        logger.error(f"❌📣 Download failed with return code: {return_code}")
         return None
     if not output_path.exists():
-        logger.error(f"📣 Expected audio file not found at {output_path}")
+        logger.error(f"❌📣 Expected audio file not found at: {output_path}")
         return None
 
     logger.info(f"📣 Audio successfully downloaded to {output_path}")

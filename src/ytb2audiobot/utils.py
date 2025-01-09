@@ -45,6 +45,7 @@ def timedelta_from_seconds(seconds: Union[str, int, float]) -> str:
     time_delta = datetime.timedelta(seconds=seconds_int)
     return str(time_delta)
 
+
 def get_youtube_move_id(url: str):
     try:
         movie_id = video_id(url)
@@ -60,7 +61,7 @@ async def create_directory_async(path):
     try:
         await aiofiles.os.mkdir(path)
     except Exception as e:
-        print(f"🔴 Create file async. Error: {e}")
+        print(f"❌ Error creating file asynchronously: {e}")
         return
 
     return path
@@ -72,7 +73,7 @@ async def delete_file_async(path: pathlib.Path):
             pass
         await asyncio.to_thread(path.unlink)
     except Exception as e:
-        print(f"🔴 Delete file async. Error: {e}")
+        print(f"❌ Error deleting file asynchronously: {e}")
 
 
 async def get_files_by_movie_id(movie_id: str, folder):
@@ -84,10 +85,10 @@ async def remove_m4a_file_if_exists(movie_id, store):
     movie_ids_files = await get_files_by_movie_id(movie_id, store)
     m4a_files = list(filter(lambda f: (f.name.endswith('.m4a')), movie_ids_files))
     if m4a_files:
-        print('💕 m4a_files: ', m4a_files)
-        print('🚮🗑 Remove file in new bitrate')
+        logger.info(f'💕 m4a files to be removed: {m4a_files}')
+        logger.info('🚮🗑 Removing files with new bitrate...')
         for f in m4a_files:
-            print('\t', '🔹', f.name)
+            logger.info(f'\t 🔹 Removing file: {f.name}')
             f.unlink()
 
 
@@ -421,10 +422,6 @@ def get_short_youtube_url(movie_id: str = ''):
 
 def get_short_youtube_url_with_http(movie_id: str = ''):
     return f'https://youtu.be/{movie_id}'
-
-
-
-
 
 
 def truncate_filename_for_telegram(filename: str) -> str:

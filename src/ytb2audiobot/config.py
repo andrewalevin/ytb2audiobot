@@ -283,3 +283,63 @@ YT_DLP_OPTIONS_DEFAULT_2 = ('--extract-audio --audio-format m4a --audio-quality 
 
 SEGMENT_AUDIO_DURATION_SEC = 39 * 60
 SEGMENT_AUDIO_DURATION_SPLIT_THRESHOLD_SEC = 101 * 60
+
+
+SEND_YOUTUBE_LINK_TEXT = '🔗 Give me your YouTube link:'
+
+DESCRIPTION_BLOCK_COMMANDS = f'''
+<b>Commands</b>
+/help
+/extra - 🔮Advanced options
+/autodownload - 🏂‍ (Works only in channels) See about #todo
+'''.strip()
+
+DESCRIPTION_BLOCK_EXTRA_OPTIONS = '''
+<b>🔮 Advanced options:</b> 
+
+ - Split by duration
+ - Split by timecodes
+ - Set audio Bitrate
+ - Get subtitles
+ - Get slice of audio
+ - Translate from any language
+'''.strip()
+
+DESCRIPTION_BLOCK_CLI = f'''
+<b>📟 CLI options</b>
+
+ - one
+ - two
+'''.strip()
+
+
+DESCRIPTION_BLOCK_REFERENCES = f'''
+<b>References</b>
+
+- https://t.me/ytb2audiostartbot (LTS)
+- https://t.me/ytb2audiobetabot (BETA) #todo-all-logs-info
+
+- https://andrewalevin.github.io/ytb2audiobot/
+- https://github.com/andrewalevin/ytb2audiobot
+- https://pypi.org/project/ytb2audiobot/
+- https://hub.docker.com/r/andrewlevin/ytb2audiobot
+'''.strip()
+
+
+DESCRIPTION_BLOCK_OKAY_AFTER_EXIT = f'''
+👋 Okay!
+Anytime you can give me a youtube link to download its audio or select one of the command:
+
+{DESCRIPTION_BLOCK_COMMANDS}
+'''.strip()
+
+BITRATE_VALUES_ROW_ONE = ['48k', '64k', '96k', '128k']
+BITRATE_VALUES_ROW_TWO = ['196k', '256k', '320k']
+BITRATE_VALUES_ALL = BITRATE_VALUES_ROW_ONE + BITRATE_VALUES_ROW_TWO
+
+
+SPLIT_DURATION_VALUES_ROW_1 = ['2', '3', '5', '7', '11', '13', '17', '19']
+SPLIT_DURATION_VALUES_ROW_2 = ['23', '29', '31', '37', '41', '43']
+SPLIT_DURATION_VALUES_ROW_3 = ['47', '53', '59', '61', '67']
+SPLIT_DURATION_VALUES_ROW_4 = ['73', '79', '83', '89']
+SPLIT_DURATION_VALUES_ALL = SPLIT_DURATION_VALUES_ROW_1 + SPLIT_DURATION_VALUES_ROW_2 + SPLIT_DURATION_VALUES_ROW_3 + SPLIT_DURATION_VALUES_ROW_4
