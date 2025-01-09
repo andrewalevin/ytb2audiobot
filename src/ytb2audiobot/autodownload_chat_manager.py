@@ -13,6 +13,7 @@ class AutodownloadChatManager:
     def __init__(self, data_dir: Union[str, Path]):
         self.hashed_chat_ids = set()
         self.data_dir = Path(data_dir)  # Accept data_dir as either str or Path
+        # todo
         self.storage_file = self.data_dir / 'autodownload-hashed_chat_ids.pkl'  # Use pathlib to create the file path
 
         # Ensure the data directory exists

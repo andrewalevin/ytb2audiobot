@@ -6,8 +6,6 @@ import asyncio
 import signal
 import sys
 
-from importlib.metadata import version
-
 from aiogram import Bot, Dispatcher, types, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import default_state, StatesGroup, State
@@ -19,10 +17,11 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from ytb2audiobot import config
 from ytb2audiobot.autodownload_chat_manager import AutodownloadChatManager
 from ytb2audiobot.callback_storage_manager import StorageCallbackManager
-from ytb2audiobot.config import SEND_YOUTUBE_LINK_TEXT, DESCRIPTION_BLOCK_COMMANDS, DESCRIPTION_BLOCK_EXTRA_OPTIONS, \
-    DESCRIPTION_BLOCK_CLI, DESCRIPTION_BLOCK_REFERENCES, DESCRIPTION_BLOCK_OKAY_AFTER_EXIT, SPLIT_DURATION_VALUES_ROW_1, \
+from ytb2audiobot.config import SEND_YOUTUBE_LINK_TEXT, DESCRIPTION_BLOCK_EXTRA_OPTIONS, \
+    DESCRIPTION_BLOCK_OKAY_AFTER_EXIT, SPLIT_DURATION_VALUES_ROW_1, \
     SPLIT_DURATION_VALUES_ROW_2, SPLIT_DURATION_VALUES_ROW_3, SPLIT_DURATION_VALUES_ROW_4, BITRATE_VALUES_ROW_ONE, \
-    BITRATE_VALUES_ROW_TWO, SPLIT_DURATION_VALUES_ALL, BITRATE_VALUES_ALL
+    BITRATE_VALUES_ROW_TWO, SPLIT_DURATION_VALUES_ALL, BITRATE_VALUES_ALL, START_AND_HELP_TEXT, \
+    TEXT_SAY_HELLO_BOT_OWNER_AT_STARTUP
 from ytb2audiobot.cron import run_periodically, empty_dir_by_cron
 from ytb2audiobot.hardworkbot import job_downloading, make_subtitles
 from ytb2audiobot.logger import logger
@@ -54,36 +53,6 @@ class StateFormMenuExtra(StatesGroup):
     slice_end_time = State()
     url = State()
     translate = State()
-
-
-DESCRIPTION_BLOCK_WELCOME = f'''
-<b>🪩 Hello!</b>
-(version:  {version(config.PACKAGE_NAME)})
-🐐
-I can download .... #todo
- - one
- - two
-'''.strip()
-
-START_AND_HELP_TEXT = f'''
-{DESCRIPTION_BLOCK_WELCOME}
-
-{DESCRIPTION_BLOCK_COMMANDS}
-
-{DESCRIPTION_BLOCK_EXTRA_OPTIONS}
-
-{DESCRIPTION_BLOCK_CLI}
-
-{DESCRIPTION_BLOCK_REFERENCES}
-'''.strip()
-
-TEXT_SAY_HELLO_BOT_OWNER_AT_STARTUP = f'''
-🚀 Bot has started! 
-
-📦 Package Version: {version(config.PACKAGE_NAME)}
-
-{DESCRIPTION_BLOCK_COMMANDS}
-'''.strip()
 
 
 @dp.message(CommandStart())

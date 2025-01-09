@@ -1,17 +1,19 @@
 from string import Template
+from importlib.metadata import version
 
 CALLBACK_WAIT_TIMEOUT_SECONDS = 8
-
-AUDIO_SPLIT_THRESHOLD_MINUTES = 101
 
 TASK_TIMEOUT_SECONDS = 60 * 30
 
 SEGMENT_DURATION_PADDING_SEC = 6
 
 SEGMENT_AUDIO_DURATION_SEC = 39 * 60
+
 SEGMENT_AUDIO_DURATION_SPLIT_THRESHOLD_SEC = 101 * 60
 
 ACTION_TRANSLATE_OVERLAY_DEFAULT = 0.3
+
+
 
 DATA_DIR_DIRNAME_IN_TEMPDIR = 'pip-ytb2audiobot-data'
 DATA_DIR_NAME = 'data'
@@ -232,3 +234,32 @@ ACTION_NAME_SLICE = 'slice'
 ACTION_NAME_OPTIONS_EXIT = 'options_exit'
 ACTION_NAME_TRANSLATE = 'translate'
 ACTION_TRANSLATE_GET_SOLO_WORDS = ['solo', 'alone', 'one', 'only']
+
+DESCRIPTION_BLOCK_WELCOME = f'''
+<b>🪩 Hello!</b>
+(version:  {version(PACKAGE_NAME)})
+🐐
+I can download .... #todo
+ - one
+ - two
+'''.strip()
+
+START_AND_HELP_TEXT = f'''
+{DESCRIPTION_BLOCK_WELCOME}
+
+{DESCRIPTION_BLOCK_COMMANDS}
+
+{DESCRIPTION_BLOCK_EXTRA_OPTIONS}
+
+{DESCRIPTION_BLOCK_CLI}
+
+{DESCRIPTION_BLOCK_REFERENCES}
+'''.strip()
+
+TEXT_SAY_HELLO_BOT_OWNER_AT_STARTUP = f'''
+🚀 Bot has started! 
+
+📦 Package Version: {version(PACKAGE_NAME)}
+
+{DESCRIPTION_BLOCK_COMMANDS}
+'''.strip()
