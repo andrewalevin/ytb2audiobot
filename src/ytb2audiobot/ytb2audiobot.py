@@ -22,7 +22,7 @@ from ytb2audiobot.config import SEND_YOUTUBE_LINK_TEXT, DESCRIPTION_BLOCK_EXTRA_
     SPLIT_DURATION_VALUES_ROW_2, SPLIT_DURATION_VALUES_ROW_3, SPLIT_DURATION_VALUES_ROW_4, BITRATE_VALUES_ROW_ONE, \
     BITRATE_VALUES_ROW_TWO, SPLIT_DURATION_VALUES_ALL, BITRATE_VALUES_ALL, START_AND_HELP_TEXT, \
     TEXT_SAY_HELLO_BOT_OWNER_AT_STARTUP
-from ytb2audiobot.cron import run_periodically, empty_dir_by_cron
+from ytb2audiobot.cron import run_periodically, empty_data_dir_by_cron
 from ytb2audiobot.hardworkbot import job_downloading, make_subtitles
 from ytb2audiobot.logger import logger
 from ytb2audiobot.slice import time_hhmmss_check_and_convert
@@ -31,7 +31,7 @@ from ytb2audiobot.utils import remove_all_in_dir, get_data_dir, get_big_youtube_
 from ytb2audiobot.cron import update_pip_package_ytdlp
 
 
-bot = Bot(token=config.TELEGRAM_VALID_TOKEN_IMAGINARY)
+bot = Bot(token=config.TELEGRAM_VALID_TOKEN_IMAGINARY_DEFAULT)
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 router = Router()
@@ -389,19 +389,17 @@ def cli_action_parser(text: str):
 
     if matching_attr in config.CLI_ACTIVATION_TRANSLATION:
         action = config.ACTION_NAME_TRANSLATE
-        attributes['overlay'] = config.ACTION_TRANSLATE_OVERLAY_DEFAULT
+        attributes['overlay'] = config.TRANSLATION_OVERLAY_ORIGIN_AUDIO_TRANSPARENCY
 
         parts = text.split(matching_attr)
         if len(parts) > 1:
             trans_param = parts[1].strip()
-            if trans_param in config.ACTION_TRANSLATE_GET_SOLO_WORDS:
-                attributes['overlay'] = .0
-
-            if is_float(trans_param):
+            try:
                 overlay_value = float(trans_param)
                 overlay_value = max(0.0, min(overlay_value, 1.0))
                 attributes['overlay'] = overlay_value
-
+            except Exception as err:
+                logger.info('🔷 Cant convert input cli val to float. Continue:')
     return action, attributes
 
 
@@ -433,10 +431,9 @@ async def handler_message(message: Message):
             bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id,
             message_text=message.text, configurations={
                 'action': cli_action,
-                'overlay': cli_attributes.get('overlay', config.ACTION_TRANSLATE_OVERLAY_DEFAULT)
+                'overlay': cli_attributes.get('overlay', '')
             })
     else:
-        logger.debug('🈯 DIRECT MESSAGE: ')
         await job_downloading(
             bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id,
             message_text=message.text)
@@ -483,13 +480,13 @@ async def handler_channel_post(message: Message):
         str(movie_id)])
 
     info_message = await message.reply(
-        text=f'Choose one of these options. \nExit in seconds: {config.CALLBACK_WAIT_TIMEOUT_SECONDS}',
+        text=f'Choose one of these options. \nExit in seconds: {config.BUTTON_CHANNEL_WAITING_DOWNLOADING_TIMEOUT_SEC}',
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=[[InlineKeyboardButton(text='📣 Just Download️', callback_data=callback_data)]]))
 
     callback_storage_manager.add_key(key=callback_data)
 
-    await asyncio.sleep(config.CALLBACK_WAIT_TIMEOUT_SECONDS)
+    await asyncio.sleep(config.BUTTON_CHANNEL_WAITING_DOWNLOADING_TIMEOUT_SEC)
 
     if callback_storage_manager.check_key_inside(key=callback_data):
         await info_message.delete()
@@ -502,19 +499,25 @@ async def run_bot_asynchronously():
     logger.info(f'🚀 Telegram bot: f{me.full_name} https://t.me/{me.username}')
 
     # Say Hello at startup to bot owner by its ID
-    if owner_id := os.getenv(config.ENV_TG_BOT_OWNER_ID, ''):
+    if config.OWNER_BOT_ID_TO_SAY_HELLOW:
         try:
-            await bot.send_message(chat_id=owner_id, text='🟩')
-            await bot.send_message(chat_id=owner_id, text=TEXT_SAY_HELLO_BOT_OWNER_AT_STARTUP)
+            await bot.send_message(chat_id=config.OWNER_BOT_ID_TO_SAY_HELLOW, text='🟩')
+            await bot.send_message(chat_id=config.OWNER_BOT_ID_TO_SAY_HELLOW, text=TEXT_SAY_HELLO_BOT_OWNER_AT_STARTUP)
         except Exception as e:
             logger.error(f'❌ Error with Say hello. Maybe user id is not valid: \n{e}')
 
-    if os.environ.get('KEEP_DATA_FILES', 'false').lower() != 'true':
+    # todo
+    if not (config.KEEP_DATA_FILES or config.DEBUG_MODE):
         logger.info('♻️🗑 Remove last files in DATA')
         remove_all_in_dir(data_dir)
 
+    # todo empty cron
     await asyncio.gather(
-        run_periodically(30, empty_dir_by_cron, {'age': 3600}),
+        run_periodically(30, empty_data_dir_by_cron, {
+            'age': config.REMOVE_AGED_DATA_FILES_SEC,
+            'keep_files': config.KEEP_DATA_FILES,
+            'folder': data_dir,
+        }),
         run_periodically(43200, update_pip_package_ytdlp, {}),
         dp.start_polling(bot),
         run_periodically(600, autodownload_chat_manager.save_hashed_chat_ids, {}))
@@ -546,26 +549,23 @@ def main():
         description='🥭 Bot. Youtube to audio telegram bot with subtitles',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    if os.getenv(config.ENV_NAME_DEBUG_MODE, 'false').lower() == 'true':
+    if config.DEBUG_MODE:
         logger.setLevel(logging.DEBUG)
         logger.debug('🎃 DEBUG mode is set. All debug messages will be in stdout.')
-        logger.debug('📌 Set KEEP_DATA_FILES Tue')
-        os.environ[config.ENV_NAME_KEEP_DATA_FILES] = 'true'
 
-    if not os.getenv(config.ENV_NAME_TOKEN, ''):
-        logger.error('❌ No TG_TOKEN variable set in env. Make add and restart bot.')
+    if not (token := os.getenv(config.ENV_NAME_TG_TOKEN, config.TELEGRAM_VALID_TOKEN_IMAGINARY_DEFAULT)):
+        logger.error(f'❌ No {config.ENV_NAME_TG_TOKEN} variable set in env. Make add and restart bot.')
         return
 
     # todo add salt to use it
-    if not os.getenv(config.ENV_NAME_TOKEN, ''):
-        logger.error('❌ No HASH_SALT variable set in .env. Make add any random hash with key SALT!')
+    if not os.getenv(config.ENV_NAME_HASH_SALT, ''):
+        logger.error(f'❌ No {config.ENV_NAME_HASH_SALT} variable set in .env. Make add any random hash with key SALT!')
         return
 
     logger.info('🗂 data_dir: ' + f'{data_dir.resolve().as_posix()}')
 
     global bot
-    bot = Bot(token=os.environ.get(config.ENV_NAME_TOKEN, config.TELEGRAM_VALID_TOKEN_IMAGINARY),
-              default=DefaultBotProperties(parse_mode='HTML'))
+    bot = Bot(token=token, default=DefaultBotProperties(parse_mode='HTML'))
 
     dp.include_router(router)
 

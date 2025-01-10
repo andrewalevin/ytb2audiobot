@@ -54,7 +54,6 @@ dependencies = [
   'yt-dlp',
   'ytb2subtitles',
   'log2telegram',
-  'humanize',
 ]
 
 

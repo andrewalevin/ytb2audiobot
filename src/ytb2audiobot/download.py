@@ -11,8 +11,6 @@ from ytb2audiobot.utils import capital2lower, get_short_youtube_url_with_http, t
 from ytb2audiobot.utils import run_command
 
 from ytb2audiobot.logger import logger
-DEBUG = False if os.getenv(config.ENV_NAME_DEBUG_MODE, 'false').lower() != 'true' else True
-
 
 
 def get_timecodes_formatted_text(timecodes_dict: Dict[int, Dict], start_time: int = 0) -> str:

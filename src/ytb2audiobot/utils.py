@@ -5,6 +5,7 @@ import pprint
 import re
 import pathlib
 import datetime
+import shutil
 import time
 from typing import Union
 
@@ -303,17 +304,25 @@ async def run_command(cmd: str, timeout: int = None, throttle_delay: int = 0):
 
     return "\n".join(stdout_lines), "\n".join(stderr_lines), return_code
 
+
 def remove_all_in_dir(data_dir: pathlib.Path):
+    """
+    Removes all files and directories within the specified directory.
+
+    Args:
+        data_dir (pathlib.Path): Path to the directory to clean.
+    """
+    if not data_dir.exists() or not data_dir.is_dir():
+        raise ValueError(f"Provided path {data_dir} is not a valid directory.")
+
     for item in data_dir.iterdir():
-        if item.is_file():
-            item.unlink()
-        elif item.is_dir():
-            for subitem in item.rglob('*'):
-                if subitem.is_file():
-                    subitem.unlink()
-                elif subitem.is_dir():
-                    subitem.rmdir()
-            item.rmdir()
+        try:
+            if item.is_file() or item.is_symlink():
+                item.unlink()  # Remove files or symlinks
+            elif item.is_dir():
+                shutil.rmtree(item)  # Recursively remove directories
+        except Exception as e:
+            print(f"Failed to remove {item}: {e}")
 
 
 def pprint_format(data):

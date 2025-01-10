@@ -1,7 +1,6 @@
 import asyncio
 import inspect
 import math
-import os
 import pathlib
 from string import Template
 
@@ -12,7 +11,7 @@ from ytbtimecodes.timecodes import extract_timecodes, timedelta_from_seconds, st
 
 from ytb2audiobot import config
 from ytb2audiobot.audio_mixer import mix_audio_m4a
-from ytb2audiobot.config import YT_DLP_OPTIONS_DEFAULT
+from ytb2audiobot.config import YT_DLP_OPTIONS_DEFAULT, SEGMENT_REBALANCE_TO_FIT_TIMECODES
 from ytb2audiobot.segmentation import segments_verification, get_segments_by_duration, \
     add_paddings_to_segments, make_magic_tail, get_segments_by_timecodes_from_dict, rebalance_segments_long_timecodes
 from ytb2audiobot.subtitles import get_subtitles_here, highlight_words_file_text
@@ -24,41 +23,6 @@ from ytb2audiobot.translate import make_translate
 from ytb2audiobot.utils import seconds2humanview, capital2lower, \
     predict_downloading_time, get_data_dir, get_big_youtube_move_id, trim_caption_to_telegram_send, get_file_size, \
     get_short_youtube_url
-
-DEBUG = False if os.getenv(config.ENV_NAME_DEBUG_MODE, 'false').lower() != 'true' else True
-
-REBALANCE_SEGMENTS_TO_FIT_TIMECODES = False if os.getenv(config.ENV_REBALANCE_SEGMENTS_TO_FIT_TIMECODES, 'false').lower() != 'true' else True
-# todo
-logger.info(f'🎆 REBALANCE_SEGMENTS_TO_FIT_TIMECODES: {REBALANCE_SEGMENTS_TO_FIT_TIMECODES}')
-
-async def telegram_send_large_text(send_func, text, max_size=4096, delay=0.5, **kwargs):
-    """
-    Sends a large text message by splitting it into chunks if it exceeds `max_size`,
-    with a delay between each chunk to avoid hitting Telegram API limits.
-
-    Args:
-        send_func (callable): The function to send the text (e.g., bot.send_message or message.edit_text).
-        text (str): The text to send.
-        max_size (int): Maximum size of a single message (default is 4096 for Telegram).
-        delay (float): Delay in seconds between sending chunks to avoid API flood (default is 0.5).
-        **kwargs: Additional arguments to pass to the send function (e.g., chat_id, parse_mode).
-    """
-    # Split text into chunks
-    text_chunks = [text[i:i + max_size] for i in range(0, len(text), max_size)]
-
-    # Send the first chunk
-    await send_func(text=text_chunks[0], **kwargs)
-
-    # Send additional chunks (if any), with delay
-    for chunk in text_chunks[1:]:
-        await asyncio.sleep(delay)  # Delay to avoid flooding
-        await send_func(text=chunk, **kwargs)
-
-
-async def handle_error(e: Exception, info_message: Message, notice: str):
-    text = f'❌ {notice}\n\n{e}'
-    logger.error(text)
-    await telegram_send_large_text(info_message, text)
 
 
 async def make_subtitles(
@@ -220,10 +184,7 @@ async def job_downloading(
 
     yt_dlp_options = get_yt_dlp_options()
 
-    logger.debug(f'🈺 Action: {action}\n\n')
-    logger.debug(f'🈴 yt-dlp options: {yt_dlp_options}\n\n')
-
-    bitrate = '48k'
+    bitrate = config.AUDIO_QUALITY_BITRATE
 
     if action == config.ACTION_NAME_BITRATE_CHANGE:
         new_bitrate = configurations.get('bitrate', '')
@@ -261,12 +222,12 @@ async def job_downloading(
             ]
 
             if action == config.ACTION_NAME_TRANSLATE:
-                # todo timeout
                 tasks[2] = (asyncio.create_task(
-                    make_translate(movie_id=movie_id, output_path=audio_path_translate_original, timeout=60*23)))
+                    make_translate(movie_id=movie_id, output_path=audio_path_translate_original,
+                                   timeout=config.KILL_JOB_DOWNLOAD_TIMEOUT_SEC)))
 
             result = await asyncio.wait_for(
-                timeout=config.TASK_TIMEOUT_SECONDS,
+                timeout=config.KILL_JOB_DOWNLOAD_TIMEOUT_SEC,
                 fut=asyncio.gather(*tasks))
 
             return result
@@ -308,7 +269,7 @@ async def job_downloading(
         else:
             audio_path_translate_final = await asyncio.wait_for(
                 mix_audio_m4a(audio_path, audio_path_translate_original, audio_path_translate_final, configurations.get('overlay'), bitrate),
-                timeout=config.TASK_TIMEOUT_SECONDS
+                timeout=config.KILL_JOB_DOWNLOAD_TIMEOUT_SEC
             )
 
             if not audio_path_translate_final or not audio_path_translate_final.exists():
@@ -364,7 +325,7 @@ async def job_downloading(
         caption_head = '🌎 Translation: \n' + caption_head
 
     # Check Rebalance by Timecodes
-    if REBALANCE_SEGMENTS_TO_FIT_TIMECODES:
+    if SEGMENT_REBALANCE_TO_FIT_TIMECODES:
         segments = rebalance_segments_long_timecodes(
             segments,
             config.TELEGRAM_MAX_CAPTION_TEXT_SIZE - len(caption_head),

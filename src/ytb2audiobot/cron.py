@@ -1,5 +1,7 @@
 import asyncio
 import datetime
+import pathlib
+
 from ytb2audiobot.utils import delete_file_async, get_data_dir, run_command
 from ytb2audiobot.logger import logger
 
@@ -20,20 +22,38 @@ async def update_pip_package_ytdlp(params: dict):
         logger.error('\n' + '\n'.join(f'\t{line}' for line in stderr.splitlines()))
 
 
-async def empty_dir_by_cron(params):
-    if not params.get('age'):
+async def empty_data_dir_by_cron(params: dict):
+    """
+    Removes files from a directory if they exceed a specified age.
+
+    Args:
+        params (dict): A dictionary containing the following keys:
+            - 'age' (int): The maximum age (in seconds) a file can have before being deleted.
+            - 'keep_files' (bool): If True, files are not deleted.
+            - 'folder' (str): The path to the folder to clean.
+    """
+    age = params.get('age')
+    keep_files = params.get('keep_files')
+    folder_path = params.get('folder')
+
+    # Validate required parameters
+    if not age or keep_files or not folder_path:
         return
 
-    data_dir = get_data_dir()
+    folder = pathlib.Path(folder_path)
+    if not folder.exists() or not folder.is_dir():
+        raise ValueError(f"Invalid folder path: {folder_path}")
 
+    # Get the current timestamp
     now = int(datetime.datetime.now().timestamp())
-    for file in data_dir.iterdir():
-        creation = int(file.stat().st_ctime)
-        if now - creation > params.get('age'):
-            #print('\t', '🔹🗑', '\t', file.name, '\t', f'DELTA: {now - creation}',
-            #      f'Creation: ', datetime.datetime.fromtimestamp(creation), f'({creation})', '\t'
-            #                                                                                 f'Current: ',
-            #      datetime.datetime.fromtimestamp(now), f'({now})', )
+
+    # Iterate through files and delete if older than specified age
+    for file in folder.iterdir():
+        if not file.is_file():
+            continue
+
+        creation_time = int(file.stat().st_ctime)
+        if now - creation_time > age:
             await delete_file_async(file)
 
 

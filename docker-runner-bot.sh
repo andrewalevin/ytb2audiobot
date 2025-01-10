@@ -9,7 +9,7 @@ echo -e "[docker-runner-bot.sh] 🐳 Starting ytb2audiobot in Docker container..
 # Set default for SILENT_MODE if not provided
 SILENT_MODE="${SILENT_MODE:-false}"
 
-LOG_TO_FILE="${LOG_TO_FILE:-false}"
+Y2A_LOG_TO_FILE="${Y2A_LOG_TO_FILE:-false}"
 LOG_FILE_NAME="output.log"
 
 echo "[docker-runner-bot.sh] SILENT_MODE is set to $SILENT_MODE."
@@ -20,7 +20,7 @@ if [ "$SILENT_MODE" = true ]; then
     echo "[docker-runner-bot.sh] 🔐 Silent mode is ON. The command will run without log output."
     ytb2audiobot > /dev/null 2>&1
 
-elif [ "$LOG_TO_FILE" = true ]; then
+elif [ "$Y2A_LOG_TO_FILE" = true ]; then
     if [[ -n "${LOG2TELEGRAM_BOT_TOKEN}" && -n "${LOG2TELEGRAM_CHAT_ID}" ]]; then
       echo "[docker-runner-bot.sh] 🦨 Running with log2telegram bot "
       log2telegram --filter-color-chars --filter-timestamps $LOG_FILE_NAME > log2telegram.log 2>&1 &
