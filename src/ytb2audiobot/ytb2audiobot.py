@@ -5,6 +5,7 @@ import argparse
 import asyncio
 import signal
 import sys
+from importlib.metadata import version
 
 from aiogram import Bot, Dispatcher, types, Router
 from aiogram.fsm.context import FSMContext
@@ -552,6 +553,8 @@ def main():
     if config.DEBUG_MODE:
         logger.setLevel(logging.DEBUG)
         logger.debug('🎃 DEBUG mode is set. All debug messages will be in stdout.')
+
+    logger.info(f'💎 Version of [{config.PACKAGE_NAME}]: {version(config.PACKAGE_NAME)}')
 
     if not (token := os.getenv(config.ENV_NAME_TG_TOKEN, config.TELEGRAM_VALID_TOKEN_IMAGINARY_DEFAULT)):
         logger.error(f'❌ No {config.ENV_NAME_TG_TOKEN} variable set in env. Make add and restart bot.')
