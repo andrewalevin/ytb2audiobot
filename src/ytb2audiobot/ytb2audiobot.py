@@ -5,6 +5,7 @@ import argparse
 import asyncio
 import signal
 import sys
+from functools import wraps
 from importlib.metadata import version
 
 from aiogram import Bot, Dispatcher, types, Router
@@ -18,7 +19,7 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from ytb2audiobot import config
 from ytb2audiobot.autodownload_chat_manager import AutodownloadChatManager
 from ytb2audiobot.callback_storage_manager import StorageCallbackManager
-from ytb2audiobot.config import SEND_YOUTUBE_LINK_TEXT, DESCRIPTION_BLOCK_EXTRA_OPTIONS, \
+from ytb2audiobot.config import DESCRIPTION_BLOCK_SEND_YOUTUBE_LINK_TEXT, DESCRIPTION_BLOCK_EXTRA_OPTIONS, \
     DESCRIPTION_BLOCK_OKAY_AFTER_EXIT, SPLIT_DURATION_VALUES_ROW_1, \
     SPLIT_DURATION_VALUES_ROW_2, SPLIT_DURATION_VALUES_ROW_3, SPLIT_DURATION_VALUES_ROW_4, BITRATE_VALUES_ROW_ONE, \
     BITRATE_VALUES_ROW_TWO, SPLIT_DURATION_VALUES_ALL, BITRATE_VALUES_ALL, START_AND_HELP_TEXT, \
@@ -27,8 +28,7 @@ from ytb2audiobot.cron import run_periodically, empty_data_dir_by_cron
 from ytb2audiobot.hardworkbot import job_downloading, make_subtitles
 from ytb2audiobot.logger import logger
 from ytb2audiobot.slice import time_hhmmss_check_and_convert
-from ytb2audiobot.utils import remove_all_in_dir, get_data_dir, get_big_youtube_move_id, create_inline_keyboard, \
-    is_float
+from ytb2audiobot.utils import remove_all_in_dir, get_data_dir, get_big_youtube_move_id, create_inline_keyboard
 from ytb2audiobot.cron import update_pip_package_ytdlp
 
 
@@ -41,8 +41,7 @@ data_dir = get_data_dir()
 
 callback_storage_manager = StorageCallbackManager()
 
-autodownload_chat_manager = AutodownloadChatManager(data_dir=data_dir)
-
+autodownload_chat_manager = AutodownloadChatManager(path=config.AUTO_DOWNLOAD_CHAT_IDS_STORAGE_FILENAME)
 
 class StateFormMenuExtra(StatesGroup):
     options = State()
@@ -56,26 +55,38 @@ class StateFormMenuExtra(StatesGroup):
     translate = State()
 
 
+def log_debug_function_name(func):
+    @wraps(func)
+    async def wrapper(message: Message, *args, **kwargs):
+        # Log the function call
+        logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=func.__name__))
+        return await func(message, *args, **kwargs)
+    return wrapper
+
+
 @dp.message(CommandStart())
 @dp.message(Command('help'))
+@log_debug_function_name
 async def handler_command_start_and_help(message: Message) -> None:
-    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
-
     await message.answer(text=START_AND_HELP_TEXT, parse_mode='HTML')
+
+
+@dp.message(Command('cli'))
+@log_debug_function_name
+async def handler_command_cli_info(message: Message) -> None:
+    await message.answer(text=config.DESCRIPTION_BLOCK_CLI , parse_mode='HTML')
 
 
 TG_EXTRA_OPTIONS_LIST = ['extra', 'options', 'advanced', 'ext', 'ex', 'opt', 'op', 'adv', 'ad']
 @dp.channel_post(Command(commands=TG_EXTRA_OPTIONS_LIST))
+@log_debug_function_name
 async def handler_extra_options_except_channel_post(message: Message) -> None:
-    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
-
-    await message.answer('❌ This command works only in bot not in channels.')
+    await message.answer('❌ This command works only in the bot, not in channels.')
 
 
 @dp.message(Command(commands=TG_EXTRA_OPTIONS_LIST), StateFilter(default_state))
+@log_debug_function_name
 async def case_show_options(message: types.Message, state: FSMContext):
-    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
-
     await state.set_state(StateFormMenuExtra.options)
     await bot.send_message(
         chat_id=message.from_user.id,
@@ -85,7 +96,7 @@ async def case_show_options(message: types.Message, state: FSMContext):
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [
                 InlineKeyboardButton(text='✂️ By duration', callback_data=config.ACTION_NAME_SPLIT_BY_DURATION),
-                InlineKeyboardButton(text='🚦️ By timecodes', callback_data=config.ACTION_NAME_SPLIT_BY_TIMECODES)],
+                InlineKeyboardButton(text='⏱️️ By timecodes', callback_data=config.ACTION_NAME_SPLIT_BY_TIMECODES)],
             [
                 InlineKeyboardButton(text='🎸 Set bitrate', callback_data=config.ACTION_NAME_BITRATE_CHANGE),
                 InlineKeyboardButton(text='✏️ Get subtitles', callback_data=config.ACTION_NAME_SUBTITLES_SHOW_OPTIONS)],
@@ -93,13 +104,12 @@ async def case_show_options(message: types.Message, state: FSMContext):
                 InlineKeyboardButton(text='🍰 Get slice', callback_data=config.ACTION_NAME_SLICE),
                 InlineKeyboardButton(text='🌎 Translate', callback_data=config.ACTION_NAME_TRANSLATE)],
             [
-                InlineKeyboardButton(text='🔚 Exit', callback_data=config.ACTION_NAME_OPTIONS_EXIT)],]))
+                InlineKeyboardButton(text='Close', callback_data=config.ACTION_NAME_OPTIONS_EXIT)],]))
 
 
 @dp.callback_query(StateFormMenuExtra.options)
+@log_debug_function_name
 async def case_options(callback_query: types.CallbackQuery, state: FSMContext):
-    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
-
     action = callback_query.data
     if action == config.ACTION_NAME_SPLIT_BY_DURATION:
         await state.update_data(action=action)
@@ -107,7 +117,7 @@ async def case_options(callback_query: types.CallbackQuery, state: FSMContext):
         await bot.edit_message_text(
             chat_id=callback_query.from_user.id,
             message_id=callback_query.message.message_id,
-            text="✂️ Select duration split parts (in minutes): ",
+            text=config.DESCRIPTION_BLOCK_SPLIT_BY_DURATION,
             reply_markup=create_inline_keyboard([
                 SPLIT_DURATION_VALUES_ROW_1,
                 SPLIT_DURATION_VALUES_ROW_2,
@@ -119,7 +129,7 @@ async def case_options(callback_query: types.CallbackQuery, state: FSMContext):
         await bot.edit_message_text(
             chat_id=callback_query.from_user.id,
             message_id=callback_query.message.message_id,
-            text=SEND_YOUTUBE_LINK_TEXT)
+            text=DESCRIPTION_BLOCK_SEND_YOUTUBE_LINK_TEXT)
         await state.set_state(StateFormMenuExtra.url)
 
     elif action == config.ACTION_NAME_BITRATE_CHANGE:
@@ -127,7 +137,7 @@ async def case_options(callback_query: types.CallbackQuery, state: FSMContext):
         await bot.edit_message_text(
             chat_id=callback_query.from_user.id,
             message_id=callback_query.message.message_id,
-            text="🎸 Select preferable bitrate (in kbps): ",
+            text=config.DESCRIPTION_BLOCK_BITRATE,
             reply_markup=create_inline_keyboard([
                 BITRATE_VALUES_ROW_ONE,
                 BITRATE_VALUES_ROW_TWO]))
@@ -138,10 +148,10 @@ async def case_options(callback_query: types.CallbackQuery, state: FSMContext):
         await bot.edit_message_text(
             chat_id=callback_query.from_user.id,
             message_id=callback_query.message.message_id,
-            text="✏️ Subtitles options: ",
+            text=config.DESCRIPTION_BLOCK_SUBTITLES,
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
                 InlineKeyboardButton(text='🔮 Retrieve All', callback_data=config.ACTION_NAME_SUBTITLES_GET_ALL),
-                InlineKeyboardButton(text='🔍 Search by word', callback_data=config.ACTION_NAME_SUBTITLES_SEARCH_WORD)]]))
+                InlineKeyboardButton(text='🔍 Search by Word', callback_data=config.ACTION_NAME_SUBTITLES_SEARCH_WORD)]]))
         await state.set_state(StateFormMenuExtra.subtitles_options)
 
     elif action == config.ACTION_NAME_SLICE:
@@ -149,8 +159,7 @@ async def case_options(callback_query: types.CallbackQuery, state: FSMContext):
         await bot.edit_message_text(
             chat_id=callback_query.from_user.id,
             message_id=callback_query.message.message_id,
-            text="🍰 Step 1/2. Give me a START time of your slice.\n "
-                 "In format 01:02:03. (hh:mm:ss) or 02:02 (mm:ss) or 78 seconds")
+            text=config.DESCRIPTION_BLOCK_SLICE_PART_ONE)
         await state.set_state(StateFormMenuExtra.slice_start_time)
 
     elif action == config.ACTION_NAME_TRANSLATE:
@@ -158,7 +167,7 @@ async def case_options(callback_query: types.CallbackQuery, state: FSMContext):
         await bot.edit_message_text(
             chat_id=callback_query.from_user.id,
             message_id=callback_query.message.message_id,
-            text=SEND_YOUTUBE_LINK_TEXT)
+            text=DESCRIPTION_BLOCK_SEND_YOUTUBE_LINK_TEXT)
         await state.set_state(StateFormMenuExtra.url)
 
     elif action == config.ACTION_NAME_OPTIONS_EXIT:
@@ -170,114 +179,106 @@ async def case_options(callback_query: types.CallbackQuery, state: FSMContext):
 
 
 @dp.callback_query(StateFormMenuExtra.split_by_duration)
+@log_debug_function_name
 async def case_split_by_duration_processing(callback_query: types.CallbackQuery, state: FSMContext):
-    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
-
     split_duration = callback_query.data
     if split_duration not in SPLIT_DURATION_VALUES_ALL:
-        await bot.edit_message_text(f'❌ An unexpected unknown split duration value was received. (split_duration={split_duration})')
+        await bot.edit_message_text(f'<b>❌ An unexpected or invalid split duration value was received.</b>\n(split_duration={split_duration})')
         await state.clear()
 
     await state.update_data(split_duration=split_duration)
     await bot.edit_message_text(
         chat_id=callback_query.from_user.id, message_id=callback_query.message.message_id,
-        text=SEND_YOUTUBE_LINK_TEXT)
+        text=DESCRIPTION_BLOCK_SEND_YOUTUBE_LINK_TEXT)
     await state.set_state(StateFormMenuExtra.url)
 
 
 @dp.callback_query(StateFormMenuExtra.bitrate)
+@log_debug_function_name
 async def case_bitrate_processing(callback_query: types.CallbackQuery, state: FSMContext):
-    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
-
     bitrate = callback_query.data
     if bitrate not in BITRATE_VALUES_ALL:
-        await bot.edit_message_text(f'❌ An unexpected unknown bitrate value was received. (bitrate={bitrate})')
+        await bot.edit_message_text(f'<b>❌ An unexpected or invalid bitrate value was received.</b>\n(bitrate={bitrate})')
         await state.clear()
 
     await state.update_data(bitrate=bitrate)
     await bot.edit_message_text(
         chat_id=callback_query.from_user.id, message_id=callback_query.message.message_id,
-        text=SEND_YOUTUBE_LINK_TEXT)
+        text=DESCRIPTION_BLOCK_SEND_YOUTUBE_LINK_TEXT)
     await state.set_state(StateFormMenuExtra.url)
 
 
 @dp.callback_query(StateFormMenuExtra.subtitles_options)
+@log_debug_function_name
 async def case_subtitles_options_processing(callback_query: types.CallbackQuery, state: FSMContext):
-    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
-
     action = callback_query.data
     if action == config.ACTION_NAME_SUBTITLES_GET_ALL:
         await state.update_data(action=action)
         await bot.edit_message_text(
             chat_id=callback_query.from_user.id, message_id=callback_query.message.message_id,
-            text=SEND_YOUTUBE_LINK_TEXT)
+            text=DESCRIPTION_BLOCK_SEND_YOUTUBE_LINK_TEXT)
         await state.set_state(StateFormMenuExtra.url)
 
     elif action == config.ACTION_NAME_SUBTITLES_SEARCH_WORD:
         await state.update_data(action=action)
         await bot.edit_message_text(
             chat_id=callback_query.from_user.id, message_id=callback_query.message.message_id,
-            text=f"🔍 Input word to search: ")
+            text=f"🔍 Enter the word to search for in subtitles:")
         await state.set_state(StateFormMenuExtra.subtitles_search_word)
 
 
 @dp.message(StateFormMenuExtra.subtitles_search_word)
+@log_debug_function_name
 async def case_subtitles_search_word(message: types.Message, state: FSMContext):
-    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
-
     subtitles_search_word = message.text
     await state.update_data(subtitles_search_word=subtitles_search_word)
-    await message.answer(text=SEND_YOUTUBE_LINK_TEXT)
+    await message.answer(text=DESCRIPTION_BLOCK_SEND_YOUTUBE_LINK_TEXT)
     await state.set_state(StateFormMenuExtra.url)
 
 
 @dp.message(StateFormMenuExtra.slice_start_time)
+@log_debug_function_name
 async def case_slice_start_time(message: types.Message, state: FSMContext):
-    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
-
     start_time = message.text
     start_time = time_hhmmss_check_and_convert(start_time)
     if start_time is None:
         await state.clear()
-        await message.answer(f'❌ Not valid time format. Try again')
+        await message.answer(f'❌ Invalid time format. Please try again.')
 
     await state.update_data(slice_start_time=start_time)
-    await message.answer(f'🍰 Step 2/2. Now give me an END time  of your slice. \n'
-                         f'In format 01:02:03. (hh:mm:ss) or 02:02 (mm:ss) 78 seconds')
+    await message.answer(config.DESCRIPTION_BLOCK_SLICE_PART_TWO)
     await state.set_state(StateFormMenuExtra.slice_end_time)
 
 
 @dp.message(StateFormMenuExtra.slice_end_time)
+@log_debug_function_name
 async def case_slice_start_time(message: types.Message, state: FSMContext):
-    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
-
     end_time = message.text
     end_time = time_hhmmss_check_and_convert(end_time)
     if end_time is None:
         await state.clear()
-        await message.answer(f'❌ Not valid time format. Try again')
+        await message.answer(f'❌ Invalid time format. Please try again.')
 
     data = await state.get_data()
     start_time = int(data.get('slice_start_time', ''))
     if start_time >= end_time:
         await state.clear()
-        await message.answer(f'❌ Start time should be less then end time. Try again')
+        await message.answer(f'❌ Start time must be earlier than the end time. Please try again.')
 
     await state.update_data(slice_end_time=end_time)
-    await message.answer(text=SEND_YOUTUBE_LINK_TEXT)
+    await message.answer(text=DESCRIPTION_BLOCK_SEND_YOUTUBE_LINK_TEXT)
     await state.set_state(StateFormMenuExtra.url)
 
 
 @dp.message(StateFormMenuExtra.url)
+@log_debug_function_name
 async def case_url(message: Message, state: FSMContext) -> None:
-    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
-
     url = message.text
     data = await state.get_data()
     await state.clear()
 
     if not get_big_youtube_move_id(url):
-        await message.answer(f'❌ Unable to extract a valid YouTube URL from your input. (url={url})')
+        await message.answer(f'<b>❌ Unable to extract a valid YouTube URL from your input.</b>\n(url={url})')
         return
 
     action = data.get('action', '')
@@ -325,26 +326,24 @@ async def case_url(message: Message, state: FSMContext) -> None:
 
 
 @dp.channel_post(Command('autodownload'))
+@log_debug_function_name
 async def handler_autodownload_switch_state(message: types.Message) -> None:
-    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
-
-    if autodownload_chat_manager.toggle_chat_state(message.sender_chat.id):
+    toggle = await autodownload_chat_manager.toggle_chat_state(message.sender_chat.id)
+    if toggle:
         await message.answer('💾 Added Chat ID to autodownloads.\n\nCall /autodownload again to remove.')
     else:
         await message.answer('♻️🗑 Removed Chat ID to autodownloads.\n\nCall /autodownload again to add.')
 
 
 @dp.message(Command('autodownload'))
+@log_debug_function_name
 async def handler_autodownload_command_in_bot(message: types.Message) -> None:
-    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
-
-    await message.answer('❌ This command works only in Channels. Add this bot to the list of admins and call it call then')
+    await message.answer('<b>❌ This command works only in Channels.</b>\nPlease add this bot to the list of admins and try again.')
 
 
 @dp.callback_query(lambda c: c.data.startswith('download:'))
+@log_debug_function_name
 async def process_callback_button(callback_query: types.CallbackQuery):
-    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
-
     await bot.answer_callback_query(callback_query.id)
 
     # Remove this key from list of callbacks
@@ -405,9 +404,8 @@ def cli_action_parser(text: str):
 
 
 @dp.message()
+@log_debug_function_name
 async def handler_message(message: Message):
-    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
-
     cli_action, cli_attributes = cli_action_parser(message.text)
 
     if cli_action == config.ACTION_NAME_SUBTITLES_GET_ALL:
@@ -441,9 +439,8 @@ async def handler_message(message: Message):
 
 
 @dp.channel_post()
+@log_debug_function_name
 async def handler_channel_post(message: Message):
-    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
-
     cli_action, cli_attributes = cli_action_parser(message.text)
 
     if cli_action == config.ACTION_NAME_SUBTITLES_GET_ALL:

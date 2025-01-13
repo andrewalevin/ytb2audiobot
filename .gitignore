@@ -7,6 +7,9 @@ data
 
 autodownload_chat_ids_hashed.txt
 
+autodownload-hashed-chat-ids.yaml
+
+
 package/data
 
 __pycache__/

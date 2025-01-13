@@ -2,6 +2,283 @@
 🦜 Youtube to Audio by Andrew A Levin
 
 
+# Install
+
+## 🐍 Python
+
+Direct install
+
+
+
+## 🐳 Docker
+
+#### Docker compose file
+
+```yaml
+services:
+  ytb2audiobot:
+    image: andrewlevin/ytb2audiobot
+    environment:
+      - Y2A_TG_TOKEN=YOUR_TG_TOKEN
+      - Y2A_HASH_SALT=YOUR_HASH_SALT
+    restart: on-failure:3
+
+```
+
+
+## Environment Options
+
+
+**Y2A_TG_TOKEN**
+
+- No Default
+
+
+**Y2A_HASH_SALT**
+
+- No Default
+
+
+**Y2A_OWNER_BOT_ID_TO_SAY_HELLOW**
+
+- No Default
+
+
+
+**Y2A_BUTTON_CHANNEL_WAITING_DOWNLOADING_TIMEOUT_SEC**
+
+- Default: 8
+
+
+**Y2A_KILL_JOB_DOWNLOAD_TIMEOUT_SEC**
+
+- Default: 2520 (seconds or 43 minutes)
+
+**Y2A_SEGMENT_AUDIO_DURATION_SEC**
+
+- Default: 2340 (seconds  or 39 minutes)
+
+
+**Y2A_SEGMENT_AUDIO_DURATION_SPLIT_THRESHOLD_SEC**
+
+- Default: 6060 (seconds  or 101 minutes)
+
+
+**Y2A_SEGMENT_DURATION_PADDING_SEC**
+
+- Default: 6 (seconds)
+
+
+**Y2A_SEGMENT_REBALANCE_TO_FIT_TIMECODES** 
+
+- Default: true
+
+
+**Y2A_TRANSLATION_OVERLAY_ORIGIN_AUDIO_TRANSPARENCY**
+
+- Default: 0.3 
+
+
+**Y2A_AUDIO_QUALITY_BITRATE**
+
+- Default: 48k
+
+- Available Values: 48k, 64k, 96k, 128k, 196k, 256k, 320k
+
+
+**Y2A_DEBUG_MODE** 
+
+- Default: false
+
+
+**Y2A_KEEP_DATA_FILES**
+
+- Default: false
+
+
+**Y2A_REMOVE_AGED_DATA_FILES_SEC**
+
+- Default: 3600 (seconds)
+
+
+**Y2A_AUTO_DOWNLOAD_CHAT_IDS_STORAGE_FILENAME**
+
+- Default: autodownload-hashed-chat-ids.yaml
+
+
+
+
+
+
+
+
+# 🚴‍♂️ Usage and Features
+
+Only send me Youtube URL and I'll make all
+
+
+
+## Commands
+```
+/help
+/extra
+/autodownload
+```
+
+
+## /autodownload - Command
+
+By default it shows lit this
+
+![](images/autodownload-just-download.jpg)
+
+Works only in Channels.
+Please add this bot to the list of admins and try again.
+
+#todo
+
+Let you to autodownload in your channels
+
+
+![](images/autodownload-add.jpg)
+
+![](images/autodownload-remove.jpg)
+
+
+## 🔮 Advanced Options
+
+You can call by any command
+
+- \advanced, \adv, \ad, \extra, \ext, \ex, \options, \opt, \op 
+
+![](images/menu-extra.jpg)
+
+### 
+
+
+## 📟 CLI options
+
+### Subtitles in CLI
+
+```bash
+youtu.be/TUJmSgViGoM subtitles 
+
+# OR
+
+youtu.be/TUJmSgViGoM subs
+
+# OR
+
+youtu.be/TUJmSgViGoM sub
+```
+
+
+Search word directly
+
+```bash
+youtu.be/TUJmSgViGoM subs beatles
+
+youtu.be/TUJmSgViGoM subs sting
+```
+
+
+### Set Bitrate in CLI
+
+```bash
+youtu.be/TUJmSgViGoM bitrate
+
+# OR
+
+youtu.be/TUJmSgViGoM bitr
+
+# OR
+
+youtu.be/TUJmSgViGoM bit
+```
+
+### Call Music in CLI
+
+
+```bash
+youtu.be/TUJmSgViGoM music
+
+# OR
+
+youtu.be/TUJmSgViGoM song
+```
+
+
+
+### 🌍 Translation
+
+Get Translation
+
+```bash
+youtu.be/TUJmSgViGoM translation
+
+# OR
+
+youtu.be/TUJmSgViGoM translate
+
+# OR
+
+youtu.be/TUJmSgViGoM transl
+
+# OR
+
+youtu.be/TUJmSgViGoM trans
+
+# OR
+
+youtu.be/TUJmSgViGoM tran
+
+# OR
+
+youtu.be/TUJmSgViGoM tra
+
+# OR
+
+youtu.be/TUJmSgViGoM tr
+```
+
+### Set overlay background original audio volume
+
+Default is 0.3
+
+```bash
+
+youtu.be/TUJmSgViGoM trans 0.6
+
+# OR
+
+youtu.be/TUJmSgViGoM trans 0.4
+
+# OR
+
+youtu.be/TUJmSgViGoM trans 0.1
+```
+
+
+**Set translation without background original audio**
+
+```bash
+
+youtu.be/TUJmSgViGoM trans 0.0
+
+# OR
+
+youtu.be/TUJmSgViGoM trans 0
+```
+
+
+
+
+
+=====
+
+
+=====
+
 
 ### Install as service unit in OS
 

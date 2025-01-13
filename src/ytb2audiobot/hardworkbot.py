@@ -10,6 +10,7 @@ from aiogram.types import FSInputFile, BufferedInputFile, Message
 from ytbtimecodes.timecodes import extract_timecodes, timedelta_from_seconds, standardize_time_format
 
 from ytb2audiobot import config
+from ytb2audiobot.audio_duration import get_duration
 from ytb2audiobot.audio_mixer import mix_audio_m4a
 from ytb2audiobot.config import YT_DLP_OPTIONS_DEFAULT, SEGMENT_REBALANCE_TO_FIT_TIMECODES
 from ytb2audiobot.segmentation import segments_verification, get_segments_by_duration, \
@@ -92,6 +93,24 @@ def get_yt_dlp_options(override_options=None):
 
     return ' '.join(rows)
 
+async def retry_job_downloading(bot: Bot,
+        sender_id: int,
+        reply_to_message_id: int | None = None,
+        message_text: str = '',
+        info_message_id: int | None = None,
+        configurations=None):
+
+
+    start_time = asyncio.get_event_loop().time()
+    end_time = start_time + config.RETRY_JOB_MAX_RETRY_DURATION
+
+    while asyncio.get_event_loop().time() < end_time:
+        try:
+            await job_downloading(bot, sender_id, reply_to_message_id, message_text, info_message_id, configurations)
+        except Exception as e:
+            logger.error(f"Error during download attempt: {e}")
+
+        await asyncio.sleep(config.RETRY_JOB_ATTEMPT_INTERVAL)
 
 
 async def job_downloading(
@@ -188,7 +207,7 @@ async def job_downloading(
 
     if action == config.ACTION_NAME_BITRATE_CHANGE:
         new_bitrate = configurations.get('bitrate', '')
-        if new_bitrate in config.BITRATES_VALUES:
+        if new_bitrate in config.BITRATE_VALUES:
             bitrate = new_bitrate
         yt_dlp_options = get_yt_dlp_options({'audio-quality': bitrate})
 
@@ -353,11 +372,11 @@ async def job_downloading(
 
     for idx, segment in enumerate(segments):
         logger.info(f'💚 Uploading audio item: {segment.get("audio_path")}')
-        start = segment.get('start')
-        end = segment.get('end')
+        segment_start = segment.get('start')
+        segment_end = segment.get('end')
         filtered_timecodes_dict = filter_timecodes_within_bounds(
-            timecodes=timecodes_dict, start_time=start + config.SEGMENT_DURATION_PADDING_SEC, end_time=end - config.SEGMENT_DURATION_PADDING_SEC - 1)
-        timecodes_text = get_timecodes_formatted_text(filtered_timecodes_dict, start)
+            timecodes=timecodes_dict, start_time=segment_start + config.SEGMENT_DURATION_PADDING_SEC, end_time=segment_end - config.SEGMENT_DURATION_PADDING_SEC - 1)
+        timecodes_text = get_timecodes_formatted_text(filtered_timecodes_dict, segment_start)
 
         if segment.get('title'):
             caption_head_additional += config.ADDITIONAL_CHAPTER_BLOCK.substitute(
@@ -365,14 +384,16 @@ async def job_downloading(
                 title=segment.get('title'))
             timecodes_text = ''
 
-        segment_duration = end - start
+        segment_path = pathlib.Path(segment.get('path'))
+
+        duration_measure = await get_duration(segment_path)
+        duration = duration_measure if duration_measure is not None else segment_end - segment_start
+
         caption = Template(caption_head).safe_substitute(
             partition='' if len(segments) == 1 else f'[Part {idx + 1} of {len(segments)}]',
-            duration=standardize_time_format(timedelta_from_seconds(segment_duration)),
+            duration=standardize_time_format(timedelta_from_seconds(duration + 1)),
             timecodes=timecodes_text,
             additional=caption_head_additional)
-
-        segment_path = pathlib.Path(segment.get('path'))
 
         # todo English filename EX https://www.youtube.com/watch?v=gYeyOZTgf2g
         fname_suffix = segment_path.name
@@ -385,7 +406,7 @@ async def job_downloading(
             audio=FSInputFile(
                 path=segment.get('path'),
                 filename=fname_prefix + fname_title + fname_suffix),
-            duration=segment_duration + 1,
+            duration=duration,
             thumbnail=FSInputFile(path=thumbnail_path) if thumbnail_path is not None else None,
             caption=caption if len(caption) < config.TELEGRAM_MAX_CAPTION_TEXT_SIZE else trim_caption_to_telegram_send(caption),
             parse_mode='HTML')

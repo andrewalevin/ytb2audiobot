@@ -1,76 +1,104 @@
-import os
+import hashlib
+import pathlib
 import random
 import string
-import pickle
 from pathlib import Path
-from typing import Union
-from ytb2audiobot.utils import get_hash
+from typing import Any, Union
+import aiofiles
+import yaml
 
-# todo add check pkl with hash of bot name
 
+def get_hash(data: Any, limit_digits: int = None) -> str:
+    """Generate SHA-256 hash for the given data.
+
+    Args:
+        data (Any): The input data to hash. It will be converted to a string if not already.
+        limit_digits (int, optional): The number of digits to return from the hash. Defaults to None, which returns the full hash.
+
+    Returns:
+        str: The SHA-256 hash of the input data, truncated to `limit_digits` if provided.
+    """
+    _hash = hashlib.sha256(str(data).encode('utf-8')).hexdigest()
+    if limit_digits:
+        return _hash[:limit_digits]  # Return the truncated hash
+    return _hash  # Return the full hash if no limit is specified
+
+def generate_random_salt(length: int = 32) -> str:
+    """Generate a random salt of a given length."""
+    characters = string.ascii_letters + string.digits
+    return ''.join(random.choices(characters, k=length))
+
+
+DEFAULT_PATH_NAME = 'autodownload-hashed-chat-ids.yaml'
 
 class AutodownloadChatManager:
-    def __init__(self, data_dir: Union[str, Path]):
+    """Manages a collection of hashed chat IDs with salted hashing and persistent storage."""
+
+    def __init__(self, path: Union[Path, str] = DEFAULT_PATH_NAME):
+        """
+        Initialize the manager with a storage file.
+
+        Args:
+            path (Union[Path, str]): The directory to store the YAML file.
+        """
         self.hashed_chat_ids = set()
-        self.data_dir = Path(data_dir)  # Accept data_dir as either str or Path
-        # todo
-        self.storage_file = self.data_dir / 'autodownload-hashed_chat_ids.pkl'  # Use pathlib to create the file path
+        self.path = Path(path)
 
-        # Ensure the data directory exists
-        self.data_dir.mkdir(parents=True, exist_ok=True)
+        if not self.path.parent.exists():
+            self.path = pathlib.Path(DEFAULT_PATH_NAME)
 
-        # Read HASH_SALT from environment variable or generate a random one
-        self.salt = os.environ.get('HASH_SALT')
+        self.salt = ""
+
+        if self.path.exists():
+            try:
+                self.restore()
+            except Exception as e:
+                print(f"Error restoring data from {self.path}: {e}")
+
         if not self.salt:
-            self.salt = self._generate_random_salt()
-            os.environ['HASH_SALT'] = self.salt  # Set the generated salt in the environment
-
-        # Restore hashed_chat_ids from file if it exists
-        self.restore_hashed_chat_ids()
-
-    def _generate_random_salt(self, length: int = 32) -> str:
-        """Generate a random salt of a given length."""
-        characters = string.ascii_letters + string.digits
-        return ''.join(random.choice(characters) for _ in range(length))
+            self.salt = generate_random_salt()
 
     def _get_hash_salted(self, chat_id: str) -> str:
         """Generate a salted hash for the given chat_id."""
-        return get_hash(chat_id) + self.salt
+        return get_hash(chat_id + self.salt, 16)
 
     def is_chat_id_inside(self, chat_id: Union[str, int]) -> bool:
         """Check if the salted hash of the chat_id exists in the storage."""
-        chat_id = str(chat_id)
-        return self._get_hash_salted(chat_id) in self.hashed_chat_ids
+        return self._get_hash_salted(str(chat_id)) in self.hashed_chat_ids
 
-    def add_chat_id(self, chat_id: str) -> None:
+    async def add_chat_id(self, chat_id: Union[str, int]) -> None:
         """Add the salted hash of the chat_id to the storage."""
-        salted_hash = self._get_hash_salted(chat_id)
-        self.hashed_chat_ids.add(salted_hash)
-        self.save_hashed_chat_ids()  # Save changes after adding
+        self.hashed_chat_ids.add(self._get_hash_salted(str(chat_id)))
+        await self.save_hashed_chat_ids()
 
-    def remove_chat_id(self, chat_id: str) -> None:
-        """Remove the salted hash of the chat_id from the storage if it exists."""
-        salted_hash = self._get_hash_salted(chat_id)
-        self.hashed_chat_ids.discard(salted_hash)
-        self.save_hashed_chat_ids()  # Save changes after removing
+    async def remove_chat_id(self, chat_id: Union[str, int]) -> None:
+        """Remove the salted hash of the chat_id from the storage."""
+        self.hashed_chat_ids.discard(self._get_hash_salted(str(chat_id)))
+        await self.save_hashed_chat_ids()
 
-    def toggle_chat_state(self, chat_id: Union[str, int]) -> bool:
+    async def toggle_chat_state(self, chat_id: Union[str, int]) -> bool:
         """Toggle the presence of the chat_id in the storage."""
-        chat_id = str(chat_id)
         if self.is_chat_id_inside(chat_id):
-            self.remove_chat_id(chat_id)
+            await self.remove_chat_id(chat_id)
+            await self.save_hashed_chat_ids()
             return False
         else:
-            self.add_chat_id(chat_id)
+            await self.add_chat_id(chat_id)
+            await self.save_hashed_chat_ids()
             return True
 
-    def restore_hashed_chat_ids(self) -> None:
-        """Restore hashed_chat_ids from a file if it exists."""
-        if self.storage_file.exists():
-            with open(self.storage_file, 'rb') as f:
-                self.hashed_chat_ids = pickle.load(f)
+    def restore(self) -> None:
+        """Restore data synchronously from the storage file."""
+        with self.path.open('r') as file:
+            data = yaml.safe_load(file)
+            self.salt = data.get('salt', '')
+            self.hashed_chat_ids = set(data.get('chat_ids', []))
 
-    async def save_hashed_chat_ids(self, params=None) -> None:
-        """Save hashed_chat_ids to a file."""
-        with open(self.storage_file, 'wb') as f:
-            pickle.dump(self.hashed_chat_ids, f)
+    async def save_hashed_chat_ids(self, _params=None) -> None:
+        """Save data asynchronously to the storage file."""
+        data = {
+            'salt': self.salt,
+            'chat_ids': list(self.hashed_chat_ids),
+        }
+        async with aiofiles.open(self.path, 'w') as file:
+            await file.write(yaml.dump(data, default_flow_style=False, sort_keys=False))

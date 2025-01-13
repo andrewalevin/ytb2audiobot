@@ -27,7 +27,13 @@ KEEP_DATA_FILES = os.getenv('Y2A_KEEP_DATA_FILES', 'false').lower() == 'true'
 
 REMOVE_AGED_DATA_FILES_SEC = int(os.getenv('Y2A_REMOVE_AGED_DATA_FILES_SEC', 60 * 60))
 
+AUTO_DOWNLOAD_CHAT_IDS_STORAGE_FILENAME = os.getenv('Y2A_AUTO_DOWNLOAD_CHAT_IDS_STORAGE_FILENAME', 'autodownload-hashed-chat-ids.yaml')
 
+
+
+# RETRY_JOB_ENABLED = os.getenv('Y2A_RETRY_JOB_ENABLED', 'true').lower() == 'true'
+# RETRY_JOB_ATTEMPT_INTERVAL = os.getenv('Y2A_RETRY_JOB_ATTEMPT_INTERVAL', 5 * 60)
+# RETRY_JOB_MAX_RETRY_DURATION = os.getenv('Y2A_RETRY_JOB_MAX_RETRY_DURATION', 2 * 60 * 60)
 
 
 ENV_NAME_TG_TOKEN = 'Y2A_TG_TOKEN'
@@ -89,53 +95,111 @@ LOG_FORMAT_CALLED_FUNCTION = Template('💈💈 ${fname}():')
 
 CAPTION_SLICE = Template('🍰 Slice from ${start_time} to ${end_time}')
 
-SEND_YOUTUBE_LINK_TEXT = '🔗 Give me your YouTube link:'
 
 DESCRIPTION_BLOCK_COMMANDS = f'''
 <b>Commands</b>
-/help
-/extra - 🔮Advanced options
-/autodownload - 🏂‍ (Works only in channels) See about #todo
-'''.strip()
+• /help - Show this help message
+• /extra - 🔮Advanced options
+• /autodownload - 🏂‍ (Works only in channels) See about #todo
+'''
+
 
 DESCRIPTION_BLOCK_EXTRA_OPTIONS = '''
-<b>🔮 Advanced options:</b> 
+<b>🔮 Advanced Options:</b>
+Choose from the following options to enhance your experience:
 
- - Split by duration
- - Split by timecodes
- - Set audio Bitrate
- - Get subtitles
- - Get slice of audio
- - Translate from any language
-'''.strip()
+<b>• ✂️ Split by Duration:</b> Divide audio into equal-length segments.
+<b>• ⏱️ Split by Timecodes:</b> Split audio based on specific timecodes.
+<b>• 🎸 Set Audio Bitrate:</b> Adjust the audio quality to your preference.
+<b>• 📝 Get Subtitles:</b> Extract subtitles from your media.
+<b>• 🎙️ Get Audio Slice:</b> Choose a specific portion of the audio to save.
+<b>• 🌍 Translate Any Language:</b> Translate text from any language to your desired one.
+
+Please select an option to proceed:'''
+
+
+DESCRIPTION_BLOCK_SPLIT_BY_DURATION = '''
+<b>✂️ Select Duration for Splitting</b> (in minutes):
+
+Please choose a duration to continue:'''
+
+
+DESCRIPTION_BLOCK_BITRATE = '''
+<b>🎸 Select Your Preferred Bitrate</b> (in kbps):
+
+<b>• 48 kbps:</b> Very low quality, smallest file size.
+<b>• 64 kbps:</b> Low quality, suitable for voice.
+<b>• 96 kbps:</b> Medium quality, smaller size.
+<b>• 128 kbps:</b> Standard quality, balanced size.
+<b>• 196 kbps:</b> High quality, great for music.
+<b>• 256 kbps:</b> Very high quality, larger size.
+<b>• 320 kbps:</b> Best quality, largest file size.
+
+Please choose a bitrate to continue:'''
+
+
+DESCRIPTION_BLOCK_SUBTITLES = '''
+<b>✏️ Subtitles Options:</b>
+
+<b>• 🔮 Retrieve All:</b> Get the complete subtitles for the video.
+<b>• 🔍 Search by Word:</b> Find specific words or phrases in the subtitles.
+
+Please select an option to proceed:'''
+
+DESCRIPTION_BLOCK_SLICE_PART_ONE = '''
+<b>🍰 Step 1/2: Enter the START time for your slice.</b>
+
+<b>⏱️ Accepted formats:</b>
+• hh:mm:ss (e.g., 01:02:03)
+• mm:ss (e.g., 02:02)
+• Seconds only (e.g., 78)
+
+Please provide the start time to continue:'''
+
+
+DESCRIPTION_BLOCK_SLICE_PART_TWO = '''
+<b>🍰 Step 2/2: Enter the END time for your slice.</b>
+
+<b>⏱️ Accepted formats:</b>
+• hh:mm:ss (e.g., 01:02:03)
+• mm:ss (e.g., 02:02)
+• Seconds only (e.g., 78)
+
+Please provide the end time to complete the process:'''
+
 
 DESCRIPTION_BLOCK_CLI = f'''
 <b>📟 CLI options</b>
 
  - one
- - two
-'''.strip()
+ - two'''
+
+
+DESCRIPTION_BLOCK_SEND_YOUTUBE_LINK_TEXT = '''
+<b>🔗 Please provide your YouTube link:</b>
+
+Paste the URL below to proceed:'''
 
 
 DESCRIPTION_BLOCK_REFERENCES = f'''
 <b>References</b>
-
 - https://t.me/ytb2audiostartbot (LTS)
 - https://t.me/ytb2audiobetabot (BETA) #todo-all-logs-info
 
 - https://andrewalevin.github.io/ytb2audiobot/
 - https://github.com/andrewalevin/ytb2audiobot
 - https://pypi.org/project/ytb2audiobot/
-- https://hub.docker.com/r/andrewlevin/ytb2audiobot
-'''.strip()
+- https://hub.docker.com/r/andrewlevin/ytb2audiobot'''
 
 
 DESCRIPTION_BLOCK_OKAY_AFTER_EXIT = f'''
-👋 Okay!
-Anytime you can give me a youtube link to download its audio or select one of the command:
+<b>👋 Okay!</b>
+
+You can provide a YouTube link anytime to download its audio, or select one of the following commands:
 
 {DESCRIPTION_BLOCK_COMMANDS}
-'''.strip()
+'''
+
 
 BITRATE_VALUES_ROW_ONE = ['48k', '64k', '96k', '128k']
 BITRATE_VALUES_ROW_TWO = ['196k', '256k', '320k']
@@ -163,10 +227,6 @@ COMMANDS_SPLIT = [
     {'name': 'split', 'alias': 'split'},
     {'name': 'split', 'alias': 'spl'},
     {'name': 'split', 'alias': 'sp'},
-    {'name': 'split', 'alias': 'разделить'},
-    {'name': 'split', 'alias': 'раздел'},
-    {'name': 'split', 'alias': 'разд'},
-    {'name': 'split', 'alias': 'раз'},
 ]
 
 COMMANDS_SPLIT_BY_TIMECODES = [
@@ -180,10 +240,7 @@ COMMANDS_SPLIT_BY_TIMECODES = [
 COMMANDS_BITRATE = [
     {'name': 'bitrate', 'alias': 'bitrate'},
     {'name': 'bitrate', 'alias': 'bitr'},
-    {'name': 'bitrate', 'alias': 'bit'},
-    {'name': 'bitrate', 'alias': 'битрейт'},
-    {'name': 'bitrate', 'alias': 'битр'},
-    {'name': 'bitrate', 'alias': 'бит'},
+    {'name': 'bitrate', 'alias': 'bit'}
 ]
 
 COMMANDS_SUBTITLES = [
@@ -192,24 +249,13 @@ COMMANDS_SUBTITLES = [
     {'name': 'subtitles', 'alias': 'subt'},
     {'name': 'subtitles', 'alias': 'subs'},
     {'name': 'subtitles', 'alias': 'sub'},
-    {'name': 'subtitles', 'alias': 'su'},
-    {'name': 'subtitles', 'alias': 'саб'},
-    {'name': 'subtitles', 'alias': 'сабы'},
-    {'name': 'subtitles', 'alias': 'субтитры'},
-    {'name': 'subtitles', 'alias': 'субт'},
-    {'name': 'subtitles', 'alias': 'суб'},
-    {'name': 'subtitles', 'alias': 'сб'},
+    {'name': 'subtitles', 'alias': 'su'}
 ]
 
 COMMANDS_FORCE_DOWNLOAD = [
     {'name': 'download', 'alias': 'download'},
     {'name': 'download', 'alias': 'down'},
     {'name': 'download', 'alias': 'dow'},
-    {'name': 'download', 'alias': 'd'},
-    {'name': 'download', 'alias': 'bot'},
-    {'name': 'download', 'alias': 'скачать'},
-    {'name': 'download', 'alias': 'скач'},
-    {'name': 'download', 'alias': 'ск'},
 ]
 
 COMMANDS_QUOTE = [
@@ -225,9 +271,9 @@ BITRATE_AUDIO_FILENAME_FORMAT_TEMPLATE = Template('-bitrate${bitrate}')
 AUDIO_FILENAME_TEMPLATE = Template('${movie_id}${bitrate}${extension}')
 THUMBNAIL_FILENAME_TEMPLATE = Template('${movie_id}-thumbnail${extension}')
 
-BITRATES_VALUES = ['48k', '64k', '96k', '128k'] + ['196k', '256k', '320k']
+BITRATE_VALUES = ['48k', '64k', '96k', '128k'] + ['196k', '256k', '320k']
 
-ACTION_MUSIC_HIGH_BITRATE = BITRATES_VALUES[-1]
+ACTION_MUSIC_HIGH_BITRATE = BITRATE_VALUES[-1]
 
 ACTION_NAME_BITRATE_CHANGE = 'bitrate_change'
 ACTION_NAME_SPLIT_BY_TIMECODES = 'split_by_timecodes'
@@ -241,13 +287,11 @@ ACTION_NAME_OPTIONS_EXIT = 'options_exit'
 ACTION_NAME_TRANSLATE = 'translate'
 
 DESCRIPTION_BLOCK_WELCOME = f'''
-<b>🪩 Hello!</b>
+<b>🪩 Welcome!</b>
 (version:  {version(PACKAGE_NAME)})
-🐐
-I can download .... #todo
- - one
- - two
-'''.strip()
+
+I’m here to help you download audio and explore additional features!
+'''
 
 START_AND_HELP_TEXT = f'''
 {DESCRIPTION_BLOCK_WELCOME}
@@ -256,10 +300,12 @@ START_AND_HELP_TEXT = f'''
 
 {DESCRIPTION_BLOCK_EXTRA_OPTIONS}
 
-{DESCRIPTION_BLOCK_CLI}
+<b>📟 CLI options</b>
+
+/cli
 
 {DESCRIPTION_BLOCK_REFERENCES}
-'''.strip()
+'''
 
 TEXT_SAY_HELLO_BOT_OWNER_AT_STARTUP = f'''
 🚀 Bot has started! 
@@ -267,4 +313,4 @@ TEXT_SAY_HELLO_BOT_OWNER_AT_STARTUP = f'''
 📦 Package Version: {version(PACKAGE_NAME)}
 
 {DESCRIPTION_BLOCK_COMMANDS}
-'''.strip()
+'''
