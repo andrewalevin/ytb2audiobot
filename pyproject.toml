@@ -52,8 +52,7 @@ dependencies = [
   'urlextract',
   'ytbtimecodes',
   'yt-dlp',
-  'ytb2subtitles',
-  'log2telegram',
+  'ytb2subtitles'
 ]
 
 
