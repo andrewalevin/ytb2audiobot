@@ -1,0 +1,12 @@
+
+services:
+  ytb2audiobot:
+    image: andrewlevin/ytb2audiobot:latest
+    environment:
+      - Y2A_TG_TOKEN=${Y2A_TG_TOKEN}
+      - Y2A_HASH_SALT=${Y2A_HASH_SALT}
+      - Y2A_OWNER_BOT_ID_TO_SAY_HELLOW={Y2A_OWNER_BOT_ID_TO_SAY_HELLOW}
+      - Y2A_SEGMENT_REBALANCE_TO_FIT_TIMECODES=${Y2A_SEGMENT_REBALANCE_TO_FIT_TIMECODES}
+      - Y2A_SEGMENT_AUDIO_DURATION_SEC=${Y2A_SEGMENT_AUDIO_DURATION_SEC}
+    restart: on-failure:3
+

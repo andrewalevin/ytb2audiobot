@@ -1,9 +1,0 @@
-
-services:
-  ytb2audiobot:
-    image: andrewlevin/ytb2audiobot
-    environment:
-      - TG_TOKEN=YOUR_TG_TOKEN
-      - HASH_SALT=YOUR_HASH_SALT
-    restart: on-failure:3
-
