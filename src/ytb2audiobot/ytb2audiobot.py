@@ -489,9 +489,8 @@ async def handler_channel_post(message: Message):
     if callback_storage_manager.check_key_inside(key=callback_data):
         await info_message.delete()
 
-
+@log_debug_function_name
 async def run_bot_asynchronously():
-    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
 
     me = await bot.get_me()
     logger.info(f'🚀 Telegram bot: f{me.full_name} https://t.me/{me.username}')
@@ -553,7 +552,8 @@ def main():
 
     logger.info(f'💎 Version of [{config.PACKAGE_NAME}]: {version(config.PACKAGE_NAME)}')
 
-    if not (token := os.getenv(config.ENV_NAME_TG_TOKEN, config.TELEGRAM_VALID_TOKEN_IMAGINARY_DEFAULT)):
+    token = os.getenv(config.ENV_NAME_TG_TOKEN, config.TELEGRAM_VALID_TOKEN_IMAGINARY_DEFAULT)
+    if not token:
         logger.error(f'❌ No {config.ENV_NAME_TG_TOKEN} variable set in env. Make add and restart bot.')
         return
 
