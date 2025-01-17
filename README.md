@@ -5,9 +5,7 @@
 
 ![Docker Image Version](https://img.shields.io/docker/v/andrewlevin/ytb2audiobot)
 
-![Python Version from PEP 621 TOML](https://raw.githubusercontent.com/andrewalevin/ytb2audiobot/refs/heads/main/pyproject.toml)
-
-
+![Build Status](https://img.shields.io/github/actions/workflow/status/andrewalevin/ytb2audiobot/python-publish.yml)
 
 # Install
 
