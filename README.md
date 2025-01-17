@@ -1,6 +1,13 @@
 # ytb2audio
 🦜 Youtube to Audio by Andrew A Levin
 
+![PyPI - Version](https://img.shields.io/pypi/v/ytb2audiobot)
+
+![Docker Image Version](https://img.shields.io/docker/v/andrewlevin/ytb2audiobot)
+
+![Python Version from PEP 621 TOML](https://raw.githubusercontent.com/andrewalevin/ytb2audiobot/refs/heads/main/pyproject.toml)
+
+
 
 # Install
 
