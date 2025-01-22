@@ -29,7 +29,7 @@ REMOVE_AGED_DATA_FILES_SEC = int(os.getenv('Y2A_REMOVE_AGED_DATA_FILES_SEC', 60 
 
 AUTO_DOWNLOAD_CHAT_IDS_STORAGE_FILENAME = os.getenv('Y2A_AUTO_DOWNLOAD_CHAT_IDS_STORAGE_FILENAME', 'autodownload-hashed-chat-ids.yaml')
 
-
+REPLY_TO_ORIGINAL = bool(os.getenv('Y2A_REPLY_TO_ORIGINAL', 'true').lower() == 'true')
 
 # RETRY_JOB_ENABLED = os.getenv('Y2A_RETRY_JOB_ENABLED', 'true').lower() == 'true'
 # RETRY_JOB_ATTEMPT_INTERVAL = os.getenv('Y2A_RETRY_JOB_ATTEMPT_INTERVAL', 5 * 60)

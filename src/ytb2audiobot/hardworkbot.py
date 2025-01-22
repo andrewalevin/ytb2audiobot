@@ -130,6 +130,8 @@ async def job_downloading(
     if not movie_id:
         return
 
+    logger.debug(f'🚁 reply_to_message_id={reply_to_message_id} \t info_message_id={info_message_id}')
+
     # Inverted logic refactor
     info_message = await bot.edit_message_text(
         chat_id=sender_id,
@@ -137,7 +139,9 @@ async def job_downloading(
         text='⏳ Preparing...'
     ) if info_message_id else await bot.send_message(
         chat_id=sender_id,
-        text='⏳ Preparing...')
+        text='⏳ Preparing...',
+        reply_to_message_id=reply_to_message_id
+    )
 
     ydl_opts = {
         'logtostderr': False,  # Avoids logging to stderr, logs to the logger instead
@@ -370,6 +374,8 @@ async def job_downloading(
 
     await info_message.edit_text('⌛🚀 Uploading to Telegram...')
 
+    reply_to_original = reply_to_message_id if config.REPLY_TO_ORIGINAL else None
+
     for idx, segment in enumerate(segments):
         logger.info(f'💚 Uploading audio item: {segment.get("audio_path")}')
         segment_start = segment.get('start')
@@ -409,6 +415,7 @@ async def job_downloading(
             duration=duration,
             thumbnail=FSInputFile(path=thumbnail_path) if thumbnail_path is not None else None,
             caption=caption if len(caption) < config.TELEGRAM_MAX_CAPTION_TEXT_SIZE else trim_caption_to_telegram_send(caption),
+            reply_to_message_id=reply_to_original,
             parse_mode='HTML')
 
         # Sleep to avoid flood in Telegram API
