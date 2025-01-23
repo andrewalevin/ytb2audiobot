@@ -1,11 +1,12 @@
+
+# ytb2audio
+
 ![Build Status](https://img.shields.io/github/actions/workflow/status/andrewalevin/ytb2audiobot/python-publish.yml)
 ![PyPI - Version](https://img.shields.io/pypi/v/ytb2audiobot)
 ![Docker Image Version](https://img.shields.io/docker/v/andrewlevin/ytb2audiobot)
 
-# ytb2audio
 
-🦜 Youtube to Audio by Andrew A Levin
-
+🦜 YouTube to Audio by Andrew A Levin
 
 
 # Install

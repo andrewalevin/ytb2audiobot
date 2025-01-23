@@ -418,6 +418,8 @@ async def job_downloading(
             reply_to_message_id=reply_to_original,
             parse_mode='HTML')
 
+        reply_to_original = None
+
         # Sleep to avoid flood in Telegram API
         if idx < len(segments) - 1:
             sleep_duration = math.floor(8 * math.log10(len(segments) + 1))
