@@ -454,9 +454,6 @@ async def handler_message(message: Message):
 async def handler_channel_post(message: Message):
     cli_action, cli_attributes = cli_action_parser(message.text)
 
-    logger.debug(f'message.sender_chat.id={message.sender_chat.id}')
-    logger.debug(f'message.from_user.id={message.from_user.id}')
-
     if cli_action == config.ACTION_NAME_SUBTITLES_GET_ALL:
         if cli_attributes['url']:
             await make_subtitles(
