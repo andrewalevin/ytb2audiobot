@@ -452,3 +452,23 @@ def is_float(string):
         return True
     except ValueError:
         return False
+
+
+async def remove_files_starting_with_async(directory: str, prefix: str):
+    # Convert the directory to a Path object
+    dir_path = pathlib.Path(directory)
+
+    # Ensure the directory exists
+    if not dir_path.is_dir():
+        raise ValueError(f"The provided path {directory} is not a valid directory.")
+
+    # Gather all tasks for deleting files asynchronously
+    tasks = []
+    for file in dir_path.iterdir():
+        if file.is_file() and file.name.startswith(prefix):
+            tasks.append(aiofiles.os.remove(file))  # Schedule file removal
+            print(f"Scheduled for deletion: {file}")
+
+    # Execute all deletion tasks
+    await asyncio.gather(*tasks)
+    print("All matching files have been deleted.")

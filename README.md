@@ -9,17 +9,11 @@
 🦜 YouTube to Audio by Andrew A Levin
 
 
-# Install
-
-## 🐍 Python
-
-Direct install
-
-
+# Installation
 
 ## 🐳 Docker
 
-#### Docker compose file
+#### Minimal Docker compose file
 
 ```yaml
 services:
@@ -29,12 +23,64 @@ services:
       - Y2A_TG_TOKEN=YOUR_TG_TOKEN
       - Y2A_HASH_SALT=YOUR_HASH_SALT
     restart: on-failure:3
+```
 
+
+#### Full Docker compose file with all options in default.
+
+See detailed description about all options below.
+
+```yaml
+services:
+  ytb2audiobot:
+    image: andrewlevin/ytb2audiobot
+    environment:
+      - Y2A_TG_TOKEN=YOUR_TG_TOKEN
+      - Y2A_HASH_SALT=YOUR_HASH_SALT
+    restart: on-failure:3
+```
+
+
+## 🐍 Python run
+
+Direct install
+
+
+#### Reqirments install
+
+TODO -> add full description
+
+```bash
+apt install ffmpeg
+
+# and  
+
+npm install -g vot-cli
+```
+
+
+You can nativly install and run as Python package 
+
+Write all you enviroments in .env file
+
+```bash
+Y2A_TG_TOKEN='751*******TOEKEN********omPmnE'
+Y2A_HASH_SALT='j298hf********YOU-HASH***********34f2'
+Y2A_OWNER_BOT_ID_TO_SAY_HELLOW='4****YOU-OWNER-ID******3'
+Y2A_SEGMENT_REBALANCE_TO_FIT_TIMECODES='true'
+Y2A_SEGMENT_AUDIO_DURATION_SEC=2404
+Y2A_DEBUG_MODE='true'
+```
+
+And after that run 
+
+```bash
+export $(grep -v '^#' .env | xargs)
+ytb2audiobot
 ```
 
 
 ## Environment Options
-
 
 **Y2A_TG_TOKEN**
 
@@ -50,40 +96,70 @@ services:
 
 - No Default
 
+Отправить сообщение при запуске вледельцу бота, что он включился и начал работу.
 
 
 **Y2A_BUTTON_CHANNEL_WAITING_DOWNLOADING_TIMEOUT_SEC**
 
 - Default: 8
 
+Время ожидания нажатия кнопки скачивания аудио для работы бота в канале.
+
+
+
 
 **Y2A_KILL_JOB_DOWNLOAD_TIMEOUT_SEC**
 
 - Default: 2520 (seconds or 43 minutes)
 
-**Y2A_SEGMENT_AUDIO_DURATION_SEC**
+Максимальная продолжительность попытки скачивания аудио.
 
-- Default: 2340 (seconds  or 39 minutes)
+После 
+
+# todo Add to info text about timeout
 
 
 **Y2A_SEGMENT_AUDIO_DURATION_SPLIT_THRESHOLD_SEC**
 
-- Default: 6060 (seconds  or 101 minutes)
+- Default: 6060 (seconds or 101 minutes)
 
+После какой продолжительности аудио будет проихсоходить разделение на части.
+
+101 секунда по-умолчанию выбрана так, что это чуть больше 1 часа и 40 минут, что должно соответсовать одной лекции,
+а также умещатьсь в максимальные размеры посылаемого файла через Telegram bot в 50 mb.
+
+
+**Y2A_SEGMENT_AUDIO_DURATION_SEC**
+
+- Default: 2340 (seconds  or 39 minutes)
+
+Разделение по частям размера сегмента.
+Последняя часть присодиняется к предпоследней, если она меньше отношения Золотого сечения.
+
+Значение по-умоляанию выбрано из оптимального, как половина времени стандартной лекции.
 
 **Y2A_SEGMENT_DURATION_PADDING_SEC**
 
 - Default: 6 (seconds)
 
+При нарезки на сегменты итогового аудио файла количество секунд наложения соседних сегментов.
+От места разделения добавляется к текущему n секунд в конце,
+и также в начале следующего.
 
 **Y2A_SEGMENT_REBALANCE_TO_FIT_TIMECODES** 
 
 - Default: true
 
+Перенарезка аудио итогового аудио файла так, чтобы в текст описание в Telegram 
+входили все timecodes.
 
 **Y2A_TRANSLATION_OVERLAY_ORIGIN_AUDIO_TRANSPARENCY**
 
 - Default: 0.3 
+
+Устанавливает громкость фоновой оригинальной дорожки.
+- 0.1 - Тихо
+- 0.9 - Оригинальная громкость непереведенного аудио
 
 
 **Y2A_AUDIO_QUALITY_BITRATE**
@@ -92,28 +168,43 @@ services:
 
 - Available Values: 48k, 64k, 96k, 128k, 196k, 256k, 320k
 
+- 48k - Меньше размер файла
+- 
 
 **Y2A_DEBUG_MODE** 
 
 - Default: false
 
+В этом режиме выводятся дорполнительные сообщения в log.
+А также Y2A_KEEP_DATA_FILES в состоянии true.
 
 **Y2A_KEEP_DATA_FILES**
 
 - Default: false
 
+Не удалять скаченные аудио файлы с сервера.
 
 **Y2A_REMOVE_AGED_DATA_FILES_SEC**
 
 - Default: 3600 (seconds)
 
+Сколько времени хранить кэш скаченных аудио файлов на сервере.
 
 **Y2A_AUTO_DOWNLOAD_CHAT_IDS_STORAGE_FILENAME**
 
 - Default: autodownload-hashed-chat-ids.yaml
 
+??
 
 
+**Y2A_REPLY_TO_ORIGINAL**
+
+- Default: true
+
+В исходещем аудио делать или нет ссылку на оригинальное сообщение.
+
+
+TODO -> Add Images
 
 
 
@@ -121,7 +212,7 @@ services:
 
 # 🚴‍♂️ Usage and Features
 
-Only send me Youtube URL and I'll make all
+Only send me YouTube URL and I'll make all
 
 
 

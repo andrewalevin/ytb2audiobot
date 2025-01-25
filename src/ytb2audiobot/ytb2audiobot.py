@@ -400,6 +400,10 @@ def cli_action_parser(text: str):
                 attributes['overlay'] = overlay_value
             except Exception as err:
                 logger.info('🔷 Cant convert input cli val to float. Continue:')
+
+    if matching_attr in config.CLI_ACTIVATION_FORCE_REDOWNLOAD:
+        action = config.ACTION_NAME_FORCE_REDOWNLOAD
+
     return action, attributes
 
 
@@ -432,6 +436,10 @@ async def handler_message(message: Message):
                 'action': cli_action,
                 'overlay': cli_attributes.get('overlay', '')
             })
+    elif cli_action == config.ACTION_NAME_FORCE_REDOWNLOAD:
+        await job_downloading(
+            bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id,
+            message_text=message.text, configurations={'action': cli_action})
     else:
         await job_downloading(
             bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id,
@@ -462,11 +470,18 @@ async def handler_channel_post(message: Message):
             message_text=message.text, configurations={'action': cli_action, 'bitrate': config.ACTION_MUSIC_HIGH_BITRATE})
         return
 
+    if cli_action == config.ACTION_NAME_FORCE_REDOWNLOAD:
+        await job_downloading(
+            bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id,
+            message_text=message.text, configurations={'action': cli_action})
+        return
+
     if autodownload_chat_manager.is_chat_id_inside(message.sender_chat.id):
         await job_downloading(
             bot=bot, sender_id=message.sender_chat.id, reply_to_message_id=message.message_id,
             message_text=message.text)
         return
+
 
     if not (movie_id := get_big_youtube_move_id(message.text)):
         return

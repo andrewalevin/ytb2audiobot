@@ -23,7 +23,7 @@ from ytb2audiobot.download import download_thumbnail_from_download, \
 from ytb2audiobot.translate import make_translate
 from ytb2audiobot.utils import seconds2humanview, capital2lower, \
     predict_downloading_time, get_data_dir, get_big_youtube_move_id, trim_caption_to_telegram_send, get_file_size, \
-    get_short_youtube_url
+    get_short_youtube_url, remove_files_starting_with_async
 
 
 async def make_subtitles(
@@ -113,6 +113,21 @@ async def retry_job_downloading(bot: Bot,
         await asyncio.sleep(config.RETRY_JOB_ATTEMPT_INTERVAL)
 
 
+async def fetch_yt_info(movie_id: str, ydl_opts = None):
+    default_ydl_opts = {
+        'logtostderr': False,  # Avoids logging to stderr, logs to the logger instead
+        'quiet': True,  # Suppresses default output,
+        'nocheckcertificate': True,
+        'no_warnings': True,
+        'skip_download': True,}
+
+    # Use provided ydl_opts or fall back to default options
+    ydl_opts = ydl_opts or default_ydl_opts
+
+    ydl = yt_dlp.YoutubeDL(ydl_opts)
+    yt_info = await asyncio.to_thread(ydl.extract_info, f"https://www.youtube.com/watch?v={movie_id}", download=False)
+    return yt_info
+
 async def job_downloading(
         bot: Bot,
         sender_id: int,
@@ -143,16 +158,13 @@ async def job_downloading(
         reply_to_message_id=reply_to_message_id
     )
 
-    ydl_opts = {
-        'logtostderr': False,  # Avoids logging to stderr, logs to the logger instead
-        'quiet': True,  # Suppresses default output,
-        'nocheckcertificate': True,
-        'no_warnings': True,
-        'skip_download': True,}
-
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            yt_info = ydl.extract_info(f"https://www.youtube.com/watch?v={movie_id}", download=False)
+        yt_info = await fetch_yt_info(movie_id,  {
+            'logtostderr': False,  # Avoids logging to stderr, logs to the logger instead
+            'quiet': True,  # Suppresses default output,
+            'nocheckcertificate': True,
+            'no_warnings': True,
+            'skip_download': True,})
     except Exception as e:
         logger.error(f'❌ Unable to extract YT-DLP info. \n\n{e}')
         await info_message.edit_text('❌ Unable to extract YT-DLP info for this movie.')
@@ -220,6 +232,10 @@ async def job_downloading(
     thumbnail_path = data_dir / f'{movie_id}-thumbnail.jpg'
     audio_path_translate_original = data_dir / f'{movie_id}-transl-ru-{bitrate}-original.m4a'
     audio_path_translate_final = data_dir / f'{movie_id}-transl-ru-{bitrate}.m4a'
+
+    if action == config.ACTION_NAME_FORCE_REDOWNLOAD:
+        logger.debug('🐘 Force Re-Download')
+        await  remove_files_starting_with_async(data_dir, f'{movie_id}')
 
     if action == config.ACTION_NAME_SLICE:
         start_time = str(configurations.get('slice_start_time'))
@@ -421,7 +437,7 @@ async def job_downloading(
         reply_to_original = None
 
         # Sleep to avoid flood in Telegram API
-        if idx < len(segments) - 1:
+        if idx != 0 and idx != len(segments) - 1:
             sleep_duration = math.floor(8 * math.log10(len(segments) + 1))
             logger.debug(f'💤😴 Sleeping for {sleep_duration} seconds.')
             await asyncio.sleep(sleep_duration)
