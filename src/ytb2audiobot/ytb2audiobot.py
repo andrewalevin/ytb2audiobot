@@ -454,25 +454,25 @@ async def handler_channel_post(message: Message):
     if cli_action == config.ACTION_NAME_SUBTITLES_GET_ALL:
         if cli_attributes['url']:
             await make_subtitles(
-                bot=bot, sender_id=message.from_user.id, url=cli_attributes['url'], reply_message_id=message.message_id)
+                bot=bot, sender_id=message.sender_chat.id, url=cli_attributes['url'], reply_message_id=message.message_id)
             return
 
     if cli_action == config.ACTION_NAME_SUBTITLES_SEARCH_WORD:
         if cli_attributes['url'] and cli_attributes['word']:
             await make_subtitles(
-                bot=bot, sender_id=message.from_user.id, url=cli_attributes['url'], reply_message_id=message.message_id,
+                bot=bot, sender_id=message.sender_chat.id, url=cli_attributes['url'], reply_message_id=message.message_id,
                 word=cli_attributes['word'])
             return
 
     if cli_action == config.ACTION_NAME_MUSIC:
         await job_downloading(
-            bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id,
+            bot=bot, sender_id=message.sender_chat.id, reply_to_message_id=message.message_id,
             message_text=message.text, configurations={'action': cli_action, 'bitrate': config.ACTION_MUSIC_HIGH_BITRATE})
         return
 
     if cli_action == config.ACTION_NAME_FORCE_REDOWNLOAD:
         await job_downloading(
-            bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id,
+            bot=bot, sender_id=message.sender_chat.id, reply_to_message_id=message.message_id,
             message_text=message.text, configurations={'action': cli_action})
         return
 

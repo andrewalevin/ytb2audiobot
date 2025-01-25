@@ -370,6 +370,26 @@ youtu.be/TUJmSgViGoM trans 0
 
 
 
+### Force Re Download audio avoiding file keepd in cache.
+
+
+```bash
+
+youtu.be/TUJmSgViGoM force
+
+# OR
+
+youtu.be/TUJmSgViGoM forc
+
+# OR
+
+youtu.be/TUJmSgViGoM for
+
+# OR
+
+youtu.be/TUJmSgViGoM f
+```
+
 
 
 =====
