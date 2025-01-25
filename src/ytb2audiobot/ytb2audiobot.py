@@ -60,7 +60,10 @@ def log_debug_function_name(func):
     async def wrapper(message: Message, *args, **kwargs):
         # Log the function call
         logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=func.__name__))
-        return await func(message, *args, **kwargs)
+        try:
+            return await func(message, *args, **kwargs)
+        except Exception as err:
+            logger.error(f"An error occurred in {func.__name__}: {err}", exc_info=True)
     return wrapper
 
 
@@ -451,6 +454,9 @@ async def handler_message(message: Message):
 async def handler_channel_post(message: Message):
     cli_action, cli_attributes = cli_action_parser(message.text)
 
+    logger.debug(f'message.sender_chat.id={message.sender_chat.id}')
+    logger.debug(f'message.from_user.id={message.from_user.id}')
+
     if cli_action == config.ACTION_NAME_SUBTITLES_GET_ALL:
         if cli_attributes['url']:
             await make_subtitles(
@@ -481,7 +487,6 @@ async def handler_channel_post(message: Message):
             bot=bot, sender_id=message.sender_chat.id, reply_to_message_id=message.message_id,
             message_text=message.text)
         return
-
 
     if not (movie_id := get_big_youtube_move_id(message.text)):
         return
@@ -585,7 +590,11 @@ def main():
 
     dp.include_router(router)
 
-    asyncio.run(run_bot_asynchronously())
+    try:
+        asyncio.run(run_bot_asynchronously())
+    except Exception as err:
+        logger.debug(f'🦀 Send Error')
+        logger.error(err)
 
 
 if __name__ == "__main__":
