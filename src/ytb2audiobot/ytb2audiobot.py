@@ -370,7 +370,10 @@ def cli_action_parser(text: str):
     action = ''
     attributes = {}
 
-    matching_attr = next((attr for attr in config.CLI_ACTIVATION_ALL if attr in text), None)
+    attributes_text = text.split(maxsplit=1)[1] if " " in text else ""
+
+    matching_attr = next((attr for attr in config.CLI_ACTIVATION_ALL if attr in attributes_text), None)
+    logger.debug(f'matching_attr: {matching_attr}')
 
     if matching_attr is None:
         return action, attributes
