@@ -213,8 +213,7 @@ SPLIT_DURATION_VALUES_ROW_4 = ['73', '79', '83', '89']
 SPLIT_DURATION_VALUES_ALL = SPLIT_DURATION_VALUES_ROW_1 + SPLIT_DURATION_VALUES_ROW_2 + SPLIT_DURATION_VALUES_ROW_3 + SPLIT_DURATION_VALUES_ROW_4
 
 
-CAPTION_HEAD_TEMPLATE = Template('''
-$partition $title
+CAPTION_HEAD_TEMPLATE = Template('''$partition $title
 <a href=\"youtu.be/$movieid\">youtu.be/$movieid</a> [$duration]
 $author $additional
 
