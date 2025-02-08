@@ -291,7 +291,7 @@ DESCRIPTION_BLOCK_WELCOME = f'''
 <b>🪩 Welcome!</b>
 (version:  {version(PACKAGE_NAME)})
 
-I’m here 🎄🎄 🦍☘️ to help you download audio and explore additional features!
+I’m here 🎄🎄 🦍☘️  to help you download audio and explore additional features!
 '''
 
 START_AND_HELP_TEXT = f'''
