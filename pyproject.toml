@@ -50,7 +50,7 @@ dependencies = [
   'pyyaml',
   'aiofiles',
   'urlextract',
-  'ytbtimecodes>=0.13',
+  'ytbtimecodes>=1.3',
   'yt-dlp',
   'ytb2subtitles'
 ]
