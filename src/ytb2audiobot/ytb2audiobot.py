@@ -1,4 +1,3 @@
-import importlib.resources
 import inspect
 import logging
 import os
@@ -63,8 +62,8 @@ def log_debug_function_name(func):
         logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=func.__name__))
         try:
             return await func(message, *args, **kwargs)
-        except Exception as err:
-            logger.error(f"An error occurred in {func.__name__}: {err}", exc_info=True)
+        except Exception as e:
+            logger.error(f"An error occurred in {func.__name__}: {e}", exc_info=True)
     return wrapper
 
 
@@ -408,8 +407,8 @@ def cli_action_parser(text: str):
                 overlay_value = float(trans_param)
                 overlay_value = max(0.0, min(overlay_value, 1.0))
                 attributes['overlay'] = overlay_value
-            except Exception as err:
-                logger.info('🔷 Cant convert input cli val to float. Continue:')
+            except Exception as e:
+                logger.error(f'🔷 Cant convert input cli val to float. Continue: \n{e}')
 
     if matching_attr in config.CLI_ACTIVATION_FORCE_REDOWNLOAD:
         action = config.ACTION_NAME_FORCE_REDOWNLOAD
@@ -594,9 +593,6 @@ def main():
 
     logger.info('🗂 data_dir: ' + f'{data_dir.resolve().as_posix()}')
 
-    js_script_path = importlib.resources.files(__package__) / "js_scripts" / "summarize_video.js"
-    logger.info(f'☎️ js_script_path : {js_script_path }')
-
     global bot
     bot = Bot(token=token, default=DefaultBotProperties(parse_mode='HTML'))
 
@@ -604,9 +600,9 @@ def main():
 
     try:
         asyncio.run(run_bot_asynchronously())
-    except Exception as err:
-        logger.debug(f'🦀 Send Error')
-        logger.error(err)
+    except Exception as e:
+        logger.debug()
+        logger.error(f'🦀 Error Running asyncio.run: \n{e}')
 
 
 if __name__ == "__main__":

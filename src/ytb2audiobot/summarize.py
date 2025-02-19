@@ -61,7 +61,7 @@ async def download_summary(movie_id: str, dir_path: str | pathlib.Path, language
             return {}
 
     # Construct and execute Node.js command
-    js_script_path = importlib.resources.files(__package__) / "js_scripts" / "summarize_movie.js"
+    js_script_path = "summarize_movie.js"
     command = f'node {js_script_path} {movie_id} {dir_path.as_posix()} {language}'
     logger.debug(f'🧬 Node command for summary: {command}')
 
