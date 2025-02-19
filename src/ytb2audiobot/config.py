@@ -87,7 +87,9 @@ CLI_ACTIVATION_SUBTITLES = ['subtitles', 'subs', 'sub']
 CLI_ACTIVATION_MUSIC = ['music', 'song']
 CLI_ACTIVATION_TRANSLATION = ['translation', 'translate', 'transl', 'trans', 'tran', 'tra', 'tr']
 CLI_ACTIVATION_FORCE_REDOWNLOAD = ['force', 'forc', 'for', 'f']
-CLI_ACTIVATION_ALL = CLI_ACTIVATION_SUBTITLES + CLI_ACTIVATION_MUSIC + CLI_ACTIVATION_TRANSLATION + CLI_ACTIVATION_FORCE_REDOWNLOAD
+CLI_ACTIVATION_SUMMARIZE = ['summarize', 'summary', 'summar', 'summ', 'sum']
+
+CLI_ACTIVATION_ALL = CLI_ACTIVATION_SUBTITLES + CLI_ACTIVATION_MUSIC + CLI_ACTIVATION_TRANSLATION + CLI_ACTIVATION_FORCE_REDOWNLOAD + CLI_ACTIVATION_SUMMARIZE
 
 
 ADDITIONAL_CHAPTER_BLOCK = Template('\n\n📌 <b>$title</b>\n[Chapter +${time_shift}]')
@@ -217,7 +219,7 @@ CAPTION_HEAD_TEMPLATE = Template('''$partition $title
 <a href=\"youtu.be/$movieid\">youtu.be/$movieid</a> [$duration]
 $author $additional
 
-$timecodes
+$content
 ''')
 
 CAPTION_TRIMMED_END_TEXT = '…\n…\n⚔️ [Text truncated to fit Telegram’s caption limit]'
@@ -286,6 +288,7 @@ ACTION_NAME_SLICE = 'slice'
 ACTION_NAME_OPTIONS_EXIT = 'options_exit'
 ACTION_NAME_TRANSLATE = 'translate'
 ACTION_NAME_FORCE_REDOWNLOAD = 'force'
+ACTION_NAME_SUMMARIZE = 'summarize'
 
 DESCRIPTION_BLOCK_WELCOME = f'''
 <b>🪩 Welcome!</b>
@@ -315,3 +318,6 @@ TEXT_SAY_HELLO_BOT_OWNER_AT_STARTUP = f'''
 
 {DESCRIPTION_BLOCK_COMMANDS}
 '''
+
+
+DELAY_LESSE_SECOND = 0.9

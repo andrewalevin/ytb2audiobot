@@ -472,3 +472,76 @@ async def remove_files_starting_with_async(directory: str, prefix: str):
     # Execute all deletion tasks
     await asyncio.gather(*tasks)
     print("All matching files have been deleted.")
+
+
+def timedelta2pretty_format(seconds: str)->str:
+    seconds = int(seconds)
+    td = datetime.timedelta(seconds=seconds)
+
+    # Extract hours, minutes, and seconds
+    hours, remainder = divmod(td.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    # Format output: hours without leading zeros, minutes and seconds always with two digits
+    if hours > 0:
+        formatted_time = f"{hours}:{minutes:02}:{seconds:02}"
+    else:
+        formatted_time = f"{minutes:02}:{seconds:02}"
+
+    return formatted_time
+
+
+def split_big_text_pretty(text, max_length=4093):
+    """Split text into chunks by lines, ensuring no part exceeds max_length."""
+    parts = []
+    current_part = []
+
+    for line in text.splitlines(keepends=True):
+        # If adding the next line exceeds max_length, save the current part
+        if sum(len(l) for l in current_part) + len(line) > max_length:
+            parts.append("".join(current_part))
+            current_part = []
+
+        current_part.append(line)
+
+    # Append the remaining lines as the last part
+    if current_part:
+        parts.append("".join(current_part))
+
+    return parts
+
+
+def format_time(seconds: int | str) -> str:
+    """Formats time in seconds to 'hh:mm:ss', 'm:ss', or '0:ss' format.
+
+    - If hours exist: 'h:mm:ss'.
+    - If only minutes exist: 'm:ss'.
+    - If under a minute: '0:ss'.
+    - If zero seconds: '0:00'.
+
+    Args:
+        seconds (int | str): Number of seconds as an integer or a string.
+
+    Returns:
+        str: Formatted time string.
+
+    Raises:
+        ValueError: If the input is not a valid non-negative integer.
+    """
+    # Convert to int if input is a string
+    try:
+        seconds = int(seconds)
+        if seconds < 0:
+            raise ValueError
+    except (ValueError, TypeError):
+        raise ValueError("Invalid input: must be a non-negative integer or string representing a non-negative integer.")
+
+    if seconds == 0:
+        return "0:00"
+
+    hours, remainder = divmod(seconds, 3600)
+    minutes, secs = divmod(remainder, 60)
+
+    if hours:
+        return f"{hours}:{minutes:02}:{secs:02}"
+    return f"{minutes}:{secs:02}" if minutes else f"0:{secs:02}"

@@ -2,6 +2,8 @@ import asyncio
 import inspect
 import math
 import pathlib
+import pprint
+import re
 from string import Template
 
 import yt_dlp
@@ -20,10 +22,11 @@ from ytb2audiobot.logger import logger
 from ytb2audiobot.download import download_thumbnail_from_download, \
     make_split_audio_second, get_chapters, get_timecodes_dict, filter_timecodes_within_bounds, \
     get_timecodes_formatted_text, download_audio_from_download, empty
+from ytb2audiobot.summarize import download_summary, get_summary_html
 from ytb2audiobot.translate import make_translate
 from ytb2audiobot.utils import seconds2humanview, capital2lower, \
     predict_downloading_time, get_data_dir, get_big_youtube_move_id, trim_caption_to_telegram_send, get_file_size, \
-    get_short_youtube_url, remove_files_starting_with_async
+    get_short_youtube_url, remove_files_starting_with_async, split_big_text_pretty
 
 
 async def make_subtitles(
@@ -36,13 +39,13 @@ async def make_subtitles(
     info_message = await bot.edit_message_text(
         chat_id=sender_id,
         message_id=editable_message_id,
-        text = '⏳ Preparing...'
+        text = '⏳ Preparing…'
     ) if editable_message_id else await bot.send_message(
         chat_id=sender_id,
         reply_to_message_id=reply_message_id,
-        text = '⏳ Preparing...')
+        text = '⏳ Preparing…')
 
-    info_message = await info_message.edit_text('⏳ Fetching subtitles...')
+    info_message = await info_message.edit_text('⏳ Fetching subtitles…')
 
     if not (movie_id := get_big_youtube_move_id(url)):
         await info_message.edit_text('❌ Unable to extract a valid YouTube movie ID from the provided URL.')
@@ -128,6 +131,12 @@ async def fetch_yt_info(movie_id: str, ydl_opts = None):
     yt_info = await asyncio.to_thread(ydl.extract_info, f"https://www.youtube.com/watch?v={movie_id}", download=False)
     return yt_info
 
+async def magic_sleep_against_flood(index: int, total_item_count: int):
+    if index != 0 and index != total_item_count - 1:
+        sleep_duration = math.floor(8 * math.log10(total_item_count+ 1))
+        logger.debug(f'💤😴 Sleeping for {sleep_duration} seconds.')
+        await asyncio.sleep(sleep_duration)
+
 async def job_downloading(
         bot: Bot,
         sender_id: int,
@@ -140,21 +149,20 @@ async def job_downloading(
 
     logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
     logger.debug(f'💹 Configurations have started: {configurations}')
+    logger.debug(f'🚁 reply_to_message_id={reply_to_message_id} \t info_message_id={info_message_id}')
 
     movie_id = get_big_youtube_move_id(message_text)
     if not movie_id:
         return
 
-    logger.debug(f'🚁 reply_to_message_id={reply_to_message_id} \t info_message_id={info_message_id}')
-
     # Inverted logic refactor
     info_message = await bot.edit_message_text(
         chat_id=sender_id,
         message_id=info_message_id,
-        text='⏳ Preparing...'
+        text='⏳ Preparing…'
     ) if info_message_id else await bot.send_message(
         chat_id=sender_id,
-        text='⏳ Preparing...',
+        text='⏳ Preparing…',
         reply_to_message_id=reply_to_message_id
     )
 
@@ -187,45 +195,16 @@ async def job_downloading(
         return
 
     action = configurations.get('action', '')
-    
-    if action == config.ACTION_NAME_TRANSLATE:
-        language = yt_info.get('language', '')
-        if language == 'ru':
-            await info_message.edit_text(
-                '🌎🚫 This movie is still in Russian. You can download its audio directly. '
-                'Please provide its URL again:')
-            return
-
-        # todo time
-        info_message = await info_message.edit_text('⏳🌎 Translation is starting. It may take some time...')
-
-    else:
-        predict_time = predict_downloading_time(yt_info.get('duration'))
-        info_message = await info_message.edit_text(f'⏳ Downloading ~ {seconds2humanview(predict_time)}...')
 
     title = yt_info.get('title', '')
     description = yt_info.get('description', '')
     author = yt_info.get('uploader', '')
     duration = yt_info.get('duration')
-    timecodes = extract_timecodes(description)
-
-    timecodes_dict = get_timecodes_dict(timecodes)
-
-    chapters = get_chapters(yt_info.get('chapters', []))
-
-    timecodes_dict.update(chapters)
-
-    # todo add depend on predict
+    language = yt_info.get('language', '')
 
     yt_dlp_options = get_yt_dlp_options()
 
     bitrate = config.AUDIO_QUALITY_BITRATE
-
-    if action == config.ACTION_NAME_BITRATE_CHANGE:
-        new_bitrate = configurations.get('bitrate', '')
-        if new_bitrate in config.BITRATE_VALUES:
-            bitrate = new_bitrate
-        yt_dlp_options = get_yt_dlp_options({'audio-quality': bitrate})
 
     data_dir = get_data_dir()
     audio_path = data_dir / f'{movie_id}-{bitrate}.m4a'
@@ -233,11 +212,29 @@ async def job_downloading(
     audio_path_translate_original = data_dir / f'{movie_id}-transl-ru-{bitrate}-original.m4a'
     audio_path_translate_final = data_dir / f'{movie_id}-transl-ru-{bitrate}.m4a'
 
+    # Output items
+    reply_output = reply_to_message_id if config.REPLY_TO_ORIGINAL else None
+
+    caption_head_output = config.CAPTION_HEAD_TEMPLATE.safe_substitute(
+        movieid=movie_id,
+        title=capital2lower(title),
+        author=capital2lower(author))
+    caption_head_additional_output = ''
+
+    predict_time_text = seconds2humanview(predict_downloading_time(yt_info.get('duration')))
+
+    summary_skip_download = True
+
     if action == config.ACTION_NAME_FORCE_REDOWNLOAD:
         logger.debug('🐘 Force Re-Download')
         await  remove_files_starting_with_async(data_dir, f'{movie_id}')
 
-    if action == config.ACTION_NAME_SLICE:
+    elif action == config.ACTION_NAME_BITRATE_CHANGE:
+        if (new_bitrate := configurations.get('bitrate')) in config.BITRATE_VALUES:
+            bitrate = new_bitrate
+        yt_dlp_options = get_yt_dlp_options({'audio-quality': bitrate})
+
+    elif action == config.ACTION_NAME_SLICE:
         start_time = str(configurations.get('slice_start_time'))
         end_time = str(configurations.get('slice_end_time'))
 
@@ -246,30 +243,109 @@ async def job_downloading(
 
         yt_dlp_options += f' --postprocessor-args \"-ss {start_time_hhmmss} -t {end_time_hhmmss}\"'
 
+        caption_head_additional_output += '\n\n'
+        caption_head_additional_output += config.CAPTION_SLICE.substitute(
+            start_time=standardize_time_format(timedelta_from_seconds(str(configurations.get('slice_start_time')))),
+            end_time=standardize_time_format(timedelta_from_seconds(str(configurations.get('slice_end_time')))))
+
+    elif action == config.ACTION_NAME_TRANSLATE:
+        if language == 'ru':
+            await info_message.edit_text('⏳🌎 This movie is still in Russian. Standard download…')
+            action = ''
+        else:
+            caption_head_output = f'🌎 Translation\n\n{caption_head_output}'
+            # todo: add time handling
+            predict_time_text = 'unknown [🌎 Translation is starting. It may take a lot of time…]'
+
+    elif action == config.ACTION_NAME_SUMMARIZE:
+        logger.info('🧬 Action == SUMMARIZE!')
+
+        info_message = await info_message.edit_text(f'⏳🧬 Summarize processing…')
+        await asyncio.sleep(config.DELAY_LESSE_SECOND)
+
+        try:
+            tasks = [
+                asyncio.create_task(
+                    download_summary(movie_id=movie_id, language=language, dir_path=data_dir))]
+
+            result = await asyncio.wait_for(
+                timeout=config.KILL_JOB_DOWNLOAD_TIMEOUT_SEC,
+                fut=asyncio.gather(*tasks))
+        except asyncio.TimeoutError:
+            logger.error(f'❌🧬 TimeoutError occurred during Single Summery().')
+            await info_message.edit_text('❌🧬 TimeoutError occurred during Single Summery().')
+            return
+        except Exception as err:
+            logger.error(f'❌🧬 Error occurred during Single Summery().\n\n{err}')
+            await info_message.edit_text('❌🧬 Error occurred during Single Summery().')
+            return
+
+        timecodes_with_summary = result[0]
+
+        if not timecodes_with_summary:
+            await info_message.edit_text('🧬💔 Failed to create the summary. Please try again later.')
+            return
+
+        logger.info('🧬 Send Message. Summary')
+        summary_html = await get_summary_html(timecodes_with_summary)
+
+        caption_summary = Template(caption_head_output).safe_substitute(
+            partition='',
+            duration=standardize_time_format(timedelta_from_seconds(duration + 1)),
+            content=summary_html,
+            additional='')
+
+        parts_summary = split_big_text_pretty(caption_summary)
+
+        await info_message.edit_text('⌛🚀🧬 Uploading Summary to Telegram…')
+        await asyncio.sleep(config.DELAY_LESSE_SECOND)
+
+        for idx, part_summary in enumerate(parts_summary):
+            await bot.send_message(chat_id=sender_id, text=part_summary, disable_web_page_preview=True)
+            # Sleep to avoid flood in Telegram API
+            await magic_sleep_against_flood(idx, len(parts_summary))
+        logger.info('🧬 Ok. Summary')
+
+        await info_message.delete()
+
+        return
+
+    info_message = await info_message.edit_text(f'⏳ Downloading ~ {predict_time_text}…')
+
+    timecodes_raw = extract_timecodes(description)
+
+    timecodes = get_timecodes_dict(timecodes_raw)
+
+    chapters = get_chapters(yt_info.get('chapters', []))
+    timecodes.update(chapters)
+
+    if not timecodes:
+        summary_skip_download = False
+
+    # todo add depend on predict
     logger.debug(f'🈴🈴 yt-dlp options: {yt_dlp_options}\n\n')
 
     # Run tasks with timeout
     async def handle_download():
         try:
-            tasks = [
+            _tasks = [
                 asyncio.create_task(
                     download_audio_from_download(movie_id=movie_id, output_path=audio_path, options=yt_dlp_options)),
                 asyncio.create_task(
                     download_thumbnail_from_download(movie_id=movie_id, output_path=thumbnail_path)),
                 asyncio.create_task(
-                    empty())
-            ]
+                    empty()),
+                asyncio.create_task(
+                    download_summary(movie_id=movie_id, language=language, dir_path=data_dir, skip=summary_skip_download))]
 
             if action == config.ACTION_NAME_TRANSLATE:
-                tasks[2] = (asyncio.create_task(
+                _tasks[2] = (asyncio.create_task(
                     make_translate(movie_id=movie_id, output_path=audio_path_translate_original,
                                    timeout=config.KILL_JOB_DOWNLOAD_TIMEOUT_SEC)))
-
-            result = await asyncio.wait_for(
+            _result = await asyncio.wait_for(
                 timeout=config.KILL_JOB_DOWNLOAD_TIMEOUT_SEC,
-                fut=asyncio.gather(*tasks))
-
-            return result
+                fut=asyncio.gather(*_tasks))
+            return _result
         except asyncio.TimeoutError:
             logger.error(f'❌ TimeoutError occurred during download_processing().')
             await info_message.edit_text('❌ TimeoutError occurred during download_processing().')
@@ -279,7 +355,7 @@ async def job_downloading(
             await info_message.edit_text('❌ Error occurred during download_processing().')
             return None, None
 
-    audio_path, thumbnail_path, audio_path_translate_original = await handle_download()
+    audio_path, thumbnail_path, audio_path_translate_original, summary = await handle_download()
     logger.debug(f'audio_path={audio_path}, thumbnail_pat={thumbnail_path}, audio_path_translate_original={audio_path_translate_original}')
     if audio_path is None:
         logger.error(f'❌ audio_path is None after downloading. Exiting.')
@@ -308,8 +384,7 @@ async def job_downloading(
         else:
             audio_path_translate_final = await asyncio.wait_for(
                 mix_audio_m4a(audio_path, audio_path_translate_original, audio_path_translate_final, configurations.get('overlay'), bitrate),
-                timeout=config.KILL_JOB_DOWNLOAD_TIMEOUT_SEC
-            )
+                timeout=config.KILL_JOB_DOWNLOAD_TIMEOUT_SEC)
 
             if not audio_path_translate_final or not audio_path_translate_final.exists():
                 logger.error(f'❌ audio_path_translate_final does not exist after downloading. Exiting.')
@@ -317,6 +392,9 @@ async def job_downloading(
                 return
 
             audio_path = audio_path_translate_final
+
+    if summary:
+        timecodes = summary
 
     segments = [{'path': audio_path, 'start': 0, 'end': duration, 'title': ''}]
 
@@ -328,7 +406,7 @@ async def job_downloading(
                 segment_duration=60 * split_duration_minutes)
 
     elif action == config.ACTION_NAME_SPLIT_BY_TIMECODES:
-        segments = get_segments_by_timecodes_from_dict(timecodes=timecodes_dict, total_duration=duration)
+        segments = get_segments_by_timecodes_from_dict(timecodes=timecodes, total_duration=duration)
 
     elif duration > config.SEGMENT_AUDIO_DURATION_SPLIT_THRESHOLD_SEC:
         segments = get_segments_by_duration(
@@ -345,30 +423,12 @@ async def job_downloading(
 
     segments = segments_verification(segments, max_segment_duration)
 
-
-    # Make head before check rebalance
-    caption_head = config.CAPTION_HEAD_TEMPLATE.safe_substitute(
-        movieid=movie_id,
-        title=capital2lower(title),
-        author=capital2lower(author))
-
-    caption_head_additional = ''
-
-    if action == config.ACTION_NAME_SLICE:
-        caption_head_additional += '\n\n'
-        caption_head_additional += config.CAPTION_SLICE.substitute(
-            start_time=standardize_time_format(timedelta_from_seconds(str(configurations.get('slice_start_time')))),
-            end_time=standardize_time_format(timedelta_from_seconds(str(configurations.get('slice_end_time')))))
-
-    if action == config.ACTION_NAME_TRANSLATE:
-        caption_head = '🌎 Translation: \n' + caption_head
-
     # Check Rebalance by Timecodes
     if SEGMENT_REBALANCE_TO_FIT_TIMECODES:
         segments = rebalance_segments_long_timecodes(
             segments,
-            config.TELEGRAM_MAX_CAPTION_TEXT_SIZE - len(caption_head),
-            timecodes_dict,
+            config.TELEGRAM_MAX_CAPTION_TEXT_SIZE - len(caption_head_output),
+            timecodes,
             config.SEGMENT_AUDIO_DURATION_SEC)
 
         segments = add_paddings_to_segments(segments, config.SEGMENT_DURATION_PADDING_SEC)
@@ -388,20 +448,17 @@ async def job_downloading(
         await info_message.edit_text(f'❌ Error: No audio segments found after processing.')
         return
 
-    await info_message.edit_text('⌛🚀 Uploading to Telegram...')
-
-    reply_to_original = reply_to_message_id if config.REPLY_TO_ORIGINAL else None
-
+    await info_message.edit_text('⌛🚀 Uploading to Telegram…')
     for idx, segment in enumerate(segments):
         logger.info(f'💚 Uploading audio item: {segment.get("audio_path")}')
         segment_start = segment.get('start')
         segment_end = segment.get('end')
         filtered_timecodes_dict = filter_timecodes_within_bounds(
-            timecodes=timecodes_dict, start_time=segment_start + config.SEGMENT_DURATION_PADDING_SEC, end_time=segment_end - config.SEGMENT_DURATION_PADDING_SEC - 1)
+            timecodes=timecodes, start_time=segment_start + config.SEGMENT_DURATION_PADDING_SEC, end_time=segment_end - config.SEGMENT_DURATION_PADDING_SEC - 1)
         timecodes_text = get_timecodes_formatted_text(filtered_timecodes_dict, segment_start)
 
         if segment.get('title'):
-            caption_head_additional += config.ADDITIONAL_CHAPTER_BLOCK.substitute(
+            caption_head_additional_output += config.ADDITIONAL_CHAPTER_BLOCK.substitute(
                 time_shift=standardize_time_format(timedelta_from_seconds(segment.get('start'))),
                 title=segment.get('title'))
             timecodes_text = ''
@@ -411,11 +468,11 @@ async def job_downloading(
         duration_measure = await get_duration(segment_path)
         duration = duration_measure if duration_measure is not None else segment_end - segment_start
 
-        caption = Template(caption_head).safe_substitute(
+        caption_output = Template(caption_head_output).safe_substitute(
             partition='' if len(segments) == 1 else f'[Part {idx + 1} of {len(segments)}]',
             duration=standardize_time_format(timedelta_from_seconds(duration + 1)),
-            timecodes=timecodes_text,
-            additional=caption_head_additional)
+            content=timecodes_text,
+            additional=caption_head_additional_output)
 
         # todo English filename EX https://www.youtube.com/watch?v=gYeyOZTgf2g
         fname_suffix = segment_path.name
@@ -430,17 +487,14 @@ async def job_downloading(
                 filename=fname_prefix + fname_title + fname_suffix),
             duration=duration,
             thumbnail=FSInputFile(path=thumbnail_path) if thumbnail_path is not None else None,
-            caption=caption if len(caption) < config.TELEGRAM_MAX_CAPTION_TEXT_SIZE else trim_caption_to_telegram_send(caption),
-            reply_to_message_id=reply_to_original,
+            caption=caption_output if len(caption_output) < config.TELEGRAM_MAX_CAPTION_TEXT_SIZE else trim_caption_to_telegram_send(caption_output),
+            reply_to_message_id=reply_output,
             parse_mode='HTML')
 
-        reply_to_original = None
+        reply_output = None
 
         # Sleep to avoid flood in Telegram API
-        if idx != 0 and idx != len(segments) - 1:
-            sleep_duration = math.floor(8 * math.log10(len(segments) + 1))
-            logger.debug(f'💤😴 Sleeping for {sleep_duration} seconds.')
-            await asyncio.sleep(sleep_duration)
+        await magic_sleep_against_flood(idx, len(segments))
 
     await info_message.delete()
     logger.info('💚💚 Done!')

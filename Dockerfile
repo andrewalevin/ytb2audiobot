@@ -19,7 +19,15 @@ RUN npm install -g npm@latest
 # Install vot-cli globally using npm
 RUN npm install -g vot-cli
 
+RUN npm install -g @vot.js/node
+
+RUN npm install -g @toil/neurojs
+
+RUN npm install -g ya-ocr
+
 ENV PYTHONUNBUFFERED=1
+
+RUN pip install --upgrade pip
 
 RUN pip install --no-cache-dir --upgrade ytb2audiobot
 

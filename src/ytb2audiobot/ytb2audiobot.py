@@ -1,3 +1,4 @@
+import importlib.resources
 import inspect
 import logging
 import os
@@ -390,6 +391,9 @@ def cli_action_parser(text: str):
                 action = config.ACTION_NAME_SUBTITLES_SEARCH_WORD
                 attributes['word'] = word
 
+    if matching_attr in config.CLI_ACTIVATION_SUMMARIZE:
+        action = config.ACTION_NAME_SUMMARIZE
+
     if matching_attr in config.CLI_ACTIVATION_MUSIC:
         action = config.ACTION_NAME_MUSIC
 
@@ -443,6 +447,11 @@ async def handler_message(message: Message):
                 'overlay': cli_attributes.get('overlay', '')
             })
     elif cli_action == config.ACTION_NAME_FORCE_REDOWNLOAD:
+        await job_downloading(
+            bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id,
+            message_text=message.text, configurations={'action': cli_action})
+
+    elif cli_action == config.ACTION_NAME_SUMMARIZE:
         await job_downloading(
             bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id,
             message_text=message.text, configurations={'action': cli_action})
@@ -584,6 +593,9 @@ def main():
         return
 
     logger.info('🗂 data_dir: ' + f'{data_dir.resolve().as_posix()}')
+
+    js_script_path = importlib.resources.files(__package__) / "js_scripts" / "summarize_video.js"
+    logger.info(f'☎️ js_script_path : {js_script_path }')
 
     global bot
     bot = Bot(token=token, default=DefaultBotProperties(parse_mode='HTML'))
