@@ -25,6 +25,10 @@ RUN npm install -g @toil/neurojs
 
 RUN npm install -g ya-ocr
 
+RUN npm install list
+
+RUN sleep 30
+
 ENV PYTHONUNBUFFERED=1
 
 RUN pip install --upgrade pip

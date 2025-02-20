@@ -7,7 +7,6 @@ from ytb2audiobot.utils import get_short_youtube_url_with_http, run_command
 
 DEBUG = False if os.getenv(config.ENV_NAME_DEBUG_MODE, 'false').lower() != 'true' else True
 
-
 async def make_translate(movie_id: str, output_path: pathlib.Path, timeout: int = None) -> Optional[pathlib.Path]:
     """
     Downloads audio from a YouTube video using yt-dlp if the audio file does not already exist.
