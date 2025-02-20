@@ -14,18 +14,11 @@ RUN curl -sL https://deb.nodesource.com/setup_current.x | sh - \
     && apt-get install -y nodejs
 
 # Update npm to the latest version
-RUN npm install -g npm@latest
+RUN npm install npm@latest \
+    && npm install vot-cli @vot.js/node @toil/neurojs ya-ocr \
+    && npm cache clean --force
 
-# Install vot-cli globally using npm
-RUN npm install -g vot-cli
-
-RUN npm install -g @vot.js/node
-
-RUN npm install -g @toil/neurojs
-
-RUN npm install -g ya-ocr
-
-RUN npm install list
+RUN npm list
 
 RUN sleep 30
 
