@@ -15,12 +15,9 @@ RUN curl -sL https://deb.nodesource.com/setup_current.x | sh - \
 
 # Update npm to the latest version
 RUN npm install npm@latest \
-    && npm install vot-cli @vot.js/node @toil/neurojs ya-ocr \
+    && npm install -g vot-cli ytb2summary \
     && npm cache clean --force
 
-RUN npm list
-
-RUN sleep 30
 
 ENV PYTHONUNBUFFERED=1
 
