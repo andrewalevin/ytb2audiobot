@@ -18,14 +18,11 @@ RUN npm install npm@latest \
     && npm install -g vot-cli ytb2summary \
     && npm cache clean --force
 
-
 ENV PYTHONUNBUFFERED=1
 
 RUN pip install --upgrade pip
 
 RUN pip install --no-cache-dir --upgrade ytb2audiobot
-
-COPY src/ytb2audiobot/js_scripts/summarize_movie.js /app/summarize_movie.js
 
 COPY docker-runner-bot.sh /app/docker-runner-bot.sh
 

@@ -2,7 +2,6 @@ import json
 import pathlib
 
 import aiofiles
-import importlib.resources
 from ytb2audiobot.logger import logger
 from ytb2audiobot.utils import run_command, format_time
 
@@ -61,8 +60,7 @@ async def download_summary(movie_id: str, dir_path: str | pathlib.Path, language
             return {}
 
     # Construct and execute Node.js command
-    js_script_path = "summarize_movie.js"
-    command = f'node {js_script_path} {movie_id} {dir_path.as_posix()} {language}'
+    command = f'ytb2summary {movie_id} {dir_path.as_posix()} {language}'
     logger.debug(f'🧬 Node command for summary: {command}')
 
     stdout, stderr, return_code = await run_command(command, timeout=20 * 60, throttle_delay=10)
