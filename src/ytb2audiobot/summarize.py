@@ -90,7 +90,7 @@ async def download_summary(movie_id: str, dir_path: str | pathlib.Path, language
         return {}
 
 
-async def get_summary_html(timecodes: dict) -> str:
+def get_summary_txt_or_html(timecodes: dict, html_mode: bool = True) -> str:
     """Generates a formatted HTML summary from timecodes.
 
     Args:
@@ -101,12 +101,18 @@ async def get_summary_html(timecodes: dict) -> str:
     Returns:
         str: A formatted HTML summary.
     """
+    summary = 'Summary'
+    title = '{} - {}'
+    if html_mode:
+        summary = f'<b>{summary}</b>'
+        title = f'<b>{title}</b>'
+
     return '\n'.join(
-        ['<b>Summary</b>'] +
+        [summary] +
         [''] +
         sum(
             [
-                ["<b>{} - {}</b>".format(format_time(time), timecode.get('title', 'Unknown Title'))] +
+                [title.format(format_time(time), timecode.get('title', 'Unknown Title'))] +
                 [''] +
                 [f' • {thesis}' for thesis in timecode.get('theses', [])] + ['']
                 for time, timecode in timecodes.items()

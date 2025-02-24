@@ -4,6 +4,7 @@ import math
 import pathlib
 import pprint
 import re
+from itertools import islice
 from string import Template
 
 import yt_dlp
@@ -22,7 +23,7 @@ from ytb2audiobot.logger import logger
 from ytb2audiobot.download import download_thumbnail_from_download, \
     make_split_audio_second, get_chapters, get_timecodes_dict, filter_timecodes_within_bounds, \
     get_timecodes_formatted_text, download_audio_from_download, empty
-from ytb2audiobot.summarize import download_summary, get_summary_html
+from ytb2audiobot.summarize import download_summary, get_summary_txt_or_html
 from ytb2audiobot.translate import make_translate
 from ytb2audiobot.utils import seconds2humanview, capital2lower, \
     predict_downloading_time, get_data_dir, get_big_youtube_move_id, trim_caption_to_telegram_send, get_file_size, \
@@ -58,20 +59,17 @@ async def make_subtitles(
         caption += f'\n\n'
         caption += f'🔎 Search word: {word}' if text else '🔦 Nothing Found! 😉'
 
-    if len(f'{caption}\n\n{text}') < config.TELEGRAM_MAX_MESSAGE_TEXT_SIZE:
-        await bot.send_message(
-            chat_id=sender_id,
-            text=f'{caption}\n\n{text}',
-            parse_mode='HTML')
+    caption = caption + '\n\n' + text
+
+    if len(caption) < config.TELEGRAM_MAX_MESSAGE_TEXT_SIZE:
+        await bot.send_message(chat_id=sender_id, text=caption, parse_mode='HTML')
     else:
-        text = highlight_words_file_text(text, word)
         await bot.send_document(
             chat_id=sender_id,
-            caption=caption,
+            caption=caption[:190].strip() + '\n...',
             document=BufferedInputFile(
                 filename=f'subtitles-{movie_id}.txt',
-                file=text.encode('utf-8')))
-
+                file=highlight_words_file_text(text, word).encode('utf-8')))
     await info_message.delete()
 
 
@@ -287,27 +285,32 @@ async def job_downloading(
             return
 
         logger.info('🧬 Send Message. Summary')
-        summary_html = await get_summary_html(timecodes_with_summary)
-
         caption_summary = Template(caption_head_output).safe_substitute(
             partition='',
             duration=standardize_time_format(timedelta_from_seconds(duration + 1)),
-            content=summary_html,
+            content=get_summary_txt_or_html(timecodes_with_summary),
             additional='')
 
-        parts_summary = split_big_text_pretty(caption_summary)
+        if len(caption_summary) < config.TELEGRAM_MAX_CAPTION_TEXT_SIZE:
+            await bot.send_message(chat_id=sender_id, text=caption_summary, disable_web_page_preview=True)
+        else:
+            caption_summary = Template(caption_head_output).safe_substitute(
+                partition='',
+                duration=standardize_time_format(timedelta_from_seconds(duration + 1)),
+                content=get_summary_txt_or_html(dict(islice(timecodes_with_summary.items(), 1))),
+                additional='')
 
-        await info_message.edit_text('⌛🚀🧬 Uploading Summary to Telegram…')
-        await asyncio.sleep(config.DELAY_LESSE_SECOND)
+            caption_summary = caption_summary[:(config.TELEGRAM_MAX_CAPTION_TEXT_SIZE - 8)].strip() + '\n...'
 
-        for idx, part_summary in enumerate(parts_summary):
-            await bot.send_message(chat_id=sender_id, text=part_summary, disable_web_page_preview=True)
-            # Sleep to avoid flood in Telegram API
-            await magic_sleep_against_flood(idx, len(parts_summary))
+            file_text = get_summary_txt_or_html(timecodes_with_summary, html_mode=False)
+
+            await bot.send_document(
+                chat_id=sender_id,
+                caption=caption_summary,
+                document=BufferedInputFile(filename=f'summary-{movie_id}.txt', file=file_text.encode('utf-8')))
+
         logger.info('🧬 Ok. Summary')
-
         await info_message.delete()
-
         return
 
     info_message = await info_message.edit_text(f'⏳ Downloading ~ {predict_time_text}…')
