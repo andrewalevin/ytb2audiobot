@@ -1,10 +1,8 @@
 import os
-import pprint
 import sys
 
 from ytb2audiobot import config
 from ytb2audiobot.download import filter_timecodes_within_bounds, get_timecodes_formatted_text
-from ytb2audiobot.logger import logger
 DEBUG = False if os.getenv(config.ENV_NAME_DEBUG_MODE, 'false').lower() != 'true' else True
 
 
@@ -149,9 +147,6 @@ def rebalance_segments_long_timecodes(
     """
 
     # todo
-    logger.debug('🎆 Rebalance process started:')
-    logger.debug(f'🎆 Segments: {pprint.pformat(segments)}')
-    logger.debug(f'🎆 Timecodes dictionary: {pprint.pformat(timecodes_dict)}')
 
     # Extract start and end times of the original segments
     full_start = segments[0].get('start')
@@ -167,7 +162,6 @@ def rebalance_segments_long_timecodes(
             full_start)
 
         if available_caption_size - len(timecodes_text) < 0:
-            logger.debug('🎆 Starting Rebalance process:')
             break
     else:
         return segments

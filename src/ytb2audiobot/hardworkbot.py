@@ -145,13 +145,12 @@ async def job_downloading(
     if configurations is None:
         configurations = {}
 
-    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
-    logger.debug(f'💹 Configurations have started: {configurations}')
-    logger.debug(f'🚁 reply_to_message_id={reply_to_message_id} \t info_message_id={info_message_id}')
-
     movie_id = get_big_youtube_move_id(message_text)
     if not movie_id:
         return
+
+    mid = '[' + movie_id[:4] + ']🔹'
+    logger.debug(f'🌀 {mid} START-JOB: configurations: {configurations}')
 
     # Inverted logic refactor
     info_message = await bot.edit_message_text(
@@ -172,7 +171,7 @@ async def job_downloading(
             'no_warnings': True,
             'skip_download': True,})
     except Exception as e:
-        logger.error(f'❌ Unable to extract YT-DLP info. \n\n{e}')
+        logger.error(f'❌ {mid} Unable to extract YT-DLP info. \n\n{e}')
         await info_message.edit_text('❌ Unable to extract YT-DLP info for this movie.')
         return
 
@@ -224,7 +223,7 @@ async def job_downloading(
     summary_skip_download = True
 
     if action == config.ACTION_NAME_FORCE_REDOWNLOAD:
-        logger.debug('🐘 Force Re-Download')
+        logger.debug(f'🐘 {mid} Force Re-Download')
         await  remove_files_starting_with_async(data_dir, f'{movie_id}')
 
     elif action == config.ACTION_NAME_BITRATE_CHANGE:
@@ -256,7 +255,7 @@ async def job_downloading(
             predict_time_text = 'unknown [🌎 Translation is starting. It may take a lot of time…]'
 
     elif action == config.ACTION_NAME_SUMMARIZE:
-        logger.info('🧬 Action == SUMMARIZE!')
+        logger.debug(f'🧬 {mid} Action == SUMMARIZE!')
 
         info_message = await info_message.edit_text(f'⏳🧬 Summarize processing…')
         await asyncio.sleep(config.DELAY_LESSE_SECOND)
@@ -270,11 +269,11 @@ async def job_downloading(
                 timeout=config.KILL_JOB_DOWNLOAD_TIMEOUT_SEC,
                 fut=asyncio.gather(*tasks))
         except asyncio.TimeoutError:
-            logger.error(f'❌🧬 TimeoutError occurred during Single Summery().')
+            logger.error(f'❌🧬 {mid} TimeoutError occurred during Single Summery().')
             await info_message.edit_text('❌🧬 TimeoutError occurred during Single Summery().')
             return
         except Exception as err:
-            logger.error(f'❌🧬 Error occurred during Single Summery().\n\n{err}')
+            logger.error(f'❌🧬 {mid} Error occurred during Single Summery().\n\n{err}')
             await info_message.edit_text('❌🧬 Error occurred during Single Summery().')
             return
 
@@ -284,7 +283,6 @@ async def job_downloading(
             await info_message.edit_text('🧬💔 Failed to create the summary. Please try again later.')
             return
 
-        logger.info('🧬 Send Message. Summary')
         caption_summary = Template(caption_head_output).safe_substitute(
             partition='',
             duration=standardize_time_format(timedelta_from_seconds(duration + 1)),
@@ -309,7 +307,6 @@ async def job_downloading(
                 caption=caption_summary,
                 document=BufferedInputFile(filename=f'summary-{movie_id}.txt', file=file_text.encode('utf-8')))
 
-        logger.info('🧬 Ok. Summary')
         await info_message.delete()
         return
 
@@ -326,7 +323,6 @@ async def job_downloading(
         summary_skip_download = False
 
     # todo add depend on predict
-    logger.debug(f'🈴🈴 yt-dlp options: {yt_dlp_options}\n\n')
 
     # Run tasks with timeout
     async def handle_download():
@@ -350,24 +346,24 @@ async def job_downloading(
                 fut=asyncio.gather(*_tasks))
             return _result
         except asyncio.TimeoutError:
-            logger.error(f'❌ TimeoutError occurred during download_processing().')
+            logger.error(f'❌ {mid} TimeoutError occurred during download_processing().')
             await info_message.edit_text('❌ TimeoutError occurred during download_processing().')
             return None, None
         except Exception as err:
-            logger.error(f'❌ Error occurred during download_processing().\n\n{err}')
+            logger.error(f'❌ {mid} Error occurred during download_processing().\n\n{err}')
             await info_message.edit_text('❌ Error occurred during download_processing().')
             return None, None
 
     audio_path, thumbnail_path, audio_path_translate_original, summary = await handle_download()
-    logger.debug(f'audio_path={audio_path}, thumbnail_pat={thumbnail_path}, audio_path_translate_original={audio_path_translate_original}')
+
     if audio_path is None:
-        logger.error(f'❌ audio_path is None after downloading. Exiting.')
+        logger.error(f'❌ {mid} audio_path is None after downloading. Exiting.')
         await info_message.edit_text('❌ Error: audio_path is None after downloading. Exiting.')
         return
 
     audio_path = pathlib.Path(audio_path)
     if not audio_path.exists():
-        logger.error(f'❌ audio_path does not exist after downloading. Exiting.')
+        logger.error(f'❌ {mid} audio_path does not exist after downloading. Exiting.')
         await info_message.edit_text('❌ Error: audio_path does not exist after downloading. Exiting.')
         return
 
@@ -378,7 +374,7 @@ async def job_downloading(
 
     if action == config.ACTION_NAME_TRANSLATE:
         if audio_path_translate_original is None:
-            logger.error(f'❌ audio_path_translate_original is None after downloading. Exiting.')
+            logger.error(f'❌ {mid} audio_path_translate_original is None after downloading. Exiting.')
             await info_message.edit_text('❌ Error: audio_path_translate_original is None after downloading. Exiting.')
             return
 
@@ -390,7 +386,7 @@ async def job_downloading(
                 timeout=config.KILL_JOB_DOWNLOAD_TIMEOUT_SEC)
 
             if not audio_path_translate_final or not audio_path_translate_final.exists():
-                logger.error(f'❌ audio_path_translate_final does not exist after downloading. Exiting.')
+                logger.error(f'❌ {mid} audio_path_translate_final does not exist after downloading. Exiting.')
                 await info_message.edit_text('❌ Error: audio_path_translate_final does not exist after downloading. Exiting.')
                 return
 
@@ -437,23 +433,23 @@ async def job_downloading(
         segments = add_paddings_to_segments(segments, config.SEGMENT_DURATION_PADDING_SEC)
 
     if not segments:
-        logger.error(f'❌ No audio segments found after processing. This could be an internal error.')
+        logger.error(f'❌ {mid} No audio segments found after processing. This could be an internal error.')
         await info_message.edit_text(f'❌ Error: No audio segments found after processing. This could be an internal error.')
         return
 
     try:
         segments = await make_split_audio_second(audio_path, segments)
     except Exception as e:
-        logger.error(f'❌ Error occurred while splitting audio into segments: {e}')
+        logger.error(f'❌ {mid} Error occurred while splitting audio into segments: {e}')
         await info_message.edit_text(f'❌ Error: Failed to split audio into segments.')
     if not segments:
-        logger.error(f'❌ No audio segments found after splitting.')
+        logger.error(f'❌ {mid} No audio segments found after splitting.')
         await info_message.edit_text(f'❌ Error: No audio segments found after processing.')
         return
 
     await info_message.edit_text('⌛🚀 Uploading to Telegram…')
     for idx, segment in enumerate(segments):
-        logger.info(f'💚 Uploading audio item: {segment.get("audio_path")}')
+        logger.info(f'💚 {mid} Uploading audio file: {segment.get("audio_path")}')
         segment_start = segment.get('start')
         segment_end = segment.get('end')
         filtered_timecodes_dict = filter_timecodes_within_bounds(
@@ -500,4 +496,4 @@ async def job_downloading(
         await magic_sleep_against_flood(idx, len(segments))
 
     await info_message.delete()
-    logger.info('💚💚 Done!')
+    logger.info(f'💚✅ {mid} Done!')

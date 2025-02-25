@@ -52,7 +52,6 @@ async def download_summary(movie_id: str, dir_path: str | pathlib.Path, language
 
     # If summary file exists, read it
     if summarize_path.exists():
-        logger.info(f'🧬 File already exists: {summarize_path}. Reading summary.')
         try:
             return await format_summary2timecodes(await read_json_async(summarize_path))
         except Exception as e:
@@ -62,9 +61,6 @@ async def download_summary(movie_id: str, dir_path: str | pathlib.Path, language
     # Construct and execute Node.js command
 
     command = f'ytb2summary --output-dir {dir_path.as_posix()} --language {language} {movie_id}'
-
-    logger.debug(f'🧬 Node command for summary: {command}')
-
     stdout, stderr, return_code = await run_command(command, timeout=20 * 60, throttle_delay=10)
 
     for line in stdout.splitlines():
@@ -79,8 +75,6 @@ async def download_summary(movie_id: str, dir_path: str | pathlib.Path, language
     if not summarize_path.exists():
         logger.error(f"❌🧬 Summary file not found: {summarize_path}")
         return {}
-
-    logger.info(f"🧬 Summary file successfully downloaded: {summarize_path}")
 
     # Read and process the summary file
     try:

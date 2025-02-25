@@ -1,4 +1,4 @@
-import os
+
 import pathlib
 from typing import Optional, List, Dict
 
@@ -6,7 +6,6 @@ from audio2splitted.audio2splitted import time_format
 from audio2splitted.utils import run_cmds
 from ytbtimecodes.timecodes import standardize_time_format
 
-from ytb2audiobot import config
 from ytb2audiobot.utils import capital2lower, get_short_youtube_url_with_http, timedelta_from_seconds
 from ytb2audiobot.utils import run_command
 
@@ -60,18 +59,15 @@ async def make_split_audio_second(audio_path: pathlib.Path, segments: list) -> l
     cmds_list = []
     for idx, segment in enumerate(segments):
         segment_file = audio_path.with_stem(f'{audio_path.stem}-p{idx + 1}-of{len(segments)}')
-        logger.debug(f'💜 Segment file: {segment_file}')
         segments[idx]['path'] = segment_file
         cmd = (
             f'ffmpeg -i {audio_path.as_posix()} -ss {time_format(segment['start'])} -to {time_format(segment['end'])} {convert_option} -y {segment_file.as_posix()}')
-        logger.debug(f'💜💜 FFmpeg command: {cmd}, Type: {type(cmd)}')
         cmds_list.append(cmd)
 
-    logger.debug(f'💜 Commands list (total {len(cmds_list)}): {cmds_list}')
+    logger.debug(f'💜 split_audio: {cmds_list}')
 
     results, all_success = await run_cmds(cmds_list)
-    logger.debug(f'💬 Results: {results}, All success: {all_success}')
-    logger.debug("🟢 All done! Now, let's check the .m4a files and their lengths.")
+    logger.debug("💜💜 split_audio: Done")
 
     return segments
 
@@ -159,7 +155,6 @@ async def download_thumbnail_from_download(
     """
     output_path = pathlib.Path(output_path)
     if output_path.exists():
-        logger.info(f"🌅 Thumbnail already exists at: {output_path}")
         return output_path
 
     url = get_short_youtube_url_with_http(movie_id)
@@ -168,16 +163,15 @@ async def download_thumbnail_from_download(
         f'yt-dlp --write-thumbnail --skip-download --convert-thumbnails jpg '
         f'--output "{output_path.with_suffix('').as_posix()}" {url}')
 
-    logger.debug(f"🌅🔰 Executing thumbnail download command: {command}")
     stdout, stderr, return_code = await run_command(command)
 
     # Log output from command
     if stdout:
         for line in stdout.splitlines():
-            logger.debug(f'{line}')
+            logger.debug(f'🌅 {line}')
     if stderr:
         for line in stderr.splitlines():
-            logger.error(line)
+            logger.error(f'🌅 {line}')
 
     # Error and file existence checks
     if return_code != 0:
@@ -188,7 +182,6 @@ async def download_thumbnail_from_download(
         logger.error(f"❌🌅 Thumbnail file not found at: {output_path.with_suffix('.jpg')}")
         return None
 
-    logger.info(f"🌅 Thumbnail successfully downloaded to: {output_path.as_posix()}")
     return output_path
 
 
@@ -209,22 +202,19 @@ async def download_audio_from_download(
     """
     output_path = pathlib.Path(output_path)
     if output_path.exists():
-        logger.info(f"📣 Audio file already exists at: {output_path}")
         return output_path
 
     url = get_short_youtube_url_with_http(movie_id)
     command = f'yt-dlp {options} --output "{output_path.as_posix()}" {url}'
 
-    logger.debug(f"📣🔰 Executing command: {command}")
-
     stdout, stderr, return_code = await run_command(command)
 
     if stdout:
         for line in stdout.splitlines():
-            logger.debug(f'{line}')
+            logger.debug(f'📣 {line}')
     if stderr:
         for line in stderr.splitlines():
-            logger.error(line)
+            logger.error(f'📣 {line}')
 
     # Check for errors or missing file
     if return_code != 0:
@@ -234,5 +224,5 @@ async def download_audio_from_download(
         logger.error(f"❌📣 Expected audio file not found at: {output_path}")
         return None
 
-    logger.info(f"📣 Audio successfully downloaded to {output_path}")
+    logger.info(f"📣✅ Audio successfully downloaded {output_path}")
     return output_path
