@@ -111,7 +111,7 @@ def add_paddings_to_segments(input_segments: list, padding_duration: int) -> lis
         {
             'start': max(first_start, segment['start'] - padding_duration),
             'end': min(last_end, segment['end'] + padding_duration),
-            'title': segment['title']
+            'title': segment.get('title', '')
         }
         for segment in input_segments
     ]
