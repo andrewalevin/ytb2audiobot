@@ -149,7 +149,7 @@ async def job_downloading(
     if not movie_id:
         return
 
-    mid = '[' + movie_id[:4] + ']🔹'
+    mid = movie_id + ' 🔹'
     logger.debug(f'🌀 {mid} START-JOB: configurations: {configurations}')
 
     # Inverted logic refactor

@@ -75,20 +75,20 @@ async def handler_command_start_and_help(message: Message) -> None:
 
 
 @dp.message(Command('cli'))
-@log_debug_function_name
+
+
+
 async def handler_command_cli_info(message: Message) -> None:
     await message.answer(text=config.DESCRIPTION_BLOCK_CLI , parse_mode='HTML')
 
 
 TG_EXTRA_OPTIONS_LIST = ['extra', 'options', 'advanced', 'ext', 'ex', 'opt', 'op', 'adv', 'ad']
 @dp.channel_post(Command(commands=TG_EXTRA_OPTIONS_LIST))
-@log_debug_function_name
 async def handler_extra_options_except_channel_post(message: Message) -> None:
     await message.answer('❌ This command works only in the bot, not in channels.')
 
 
 @dp.message(Command(commands=TG_EXTRA_OPTIONS_LIST), StateFilter(default_state))
-@log_debug_function_name
 async def case_show_options(message: types.Message, state: FSMContext):
     await state.set_state(StateFormMenuExtra.options)
     await bot.send_message(
@@ -111,7 +111,6 @@ async def case_show_options(message: types.Message, state: FSMContext):
 
 
 @dp.callback_query(StateFormMenuExtra.options)
-@log_debug_function_name
 async def case_options(callback_query: types.CallbackQuery, state: FSMContext):
     action = callback_query.data
     if action == config.ACTION_NAME_SPLIT_BY_DURATION:
@@ -182,7 +181,6 @@ async def case_options(callback_query: types.CallbackQuery, state: FSMContext):
 
 
 @dp.callback_query(StateFormMenuExtra.split_by_duration)
-@log_debug_function_name
 async def case_split_by_duration_processing(callback_query: types.CallbackQuery, state: FSMContext):
     split_duration = callback_query.data
     if split_duration not in SPLIT_DURATION_VALUES_ALL:
@@ -197,7 +195,6 @@ async def case_split_by_duration_processing(callback_query: types.CallbackQuery,
 
 
 @dp.callback_query(StateFormMenuExtra.bitrate)
-@log_debug_function_name
 async def case_bitrate_processing(callback_query: types.CallbackQuery, state: FSMContext):
     bitrate = callback_query.data
     if bitrate not in BITRATE_VALUES_ALL:
@@ -212,7 +209,6 @@ async def case_bitrate_processing(callback_query: types.CallbackQuery, state: FS
 
 
 @dp.callback_query(StateFormMenuExtra.subtitles_options)
-@log_debug_function_name
 async def case_subtitles_options_processing(callback_query: types.CallbackQuery, state: FSMContext):
     action = callback_query.data
     if action == config.ACTION_NAME_SUBTITLES_GET_ALL:
@@ -231,7 +227,6 @@ async def case_subtitles_options_processing(callback_query: types.CallbackQuery,
 
 
 @dp.message(StateFormMenuExtra.subtitles_search_word)
-@log_debug_function_name
 async def case_subtitles_search_word(message: types.Message, state: FSMContext):
     subtitles_search_word = message.text
     await state.update_data(subtitles_search_word=subtitles_search_word)
@@ -240,7 +235,6 @@ async def case_subtitles_search_word(message: types.Message, state: FSMContext):
 
 
 @dp.message(StateFormMenuExtra.slice_start_time)
-@log_debug_function_name
 async def case_slice_start_time(message: types.Message, state: FSMContext):
     start_time = message.text
     start_time = time_hhmmss_check_and_convert(start_time)
@@ -254,7 +248,6 @@ async def case_slice_start_time(message: types.Message, state: FSMContext):
 
 
 @dp.message(StateFormMenuExtra.slice_end_time)
-@log_debug_function_name
 async def case_slice_start_time(message: types.Message, state: FSMContext):
     end_time = message.text
     end_time = time_hhmmss_check_and_convert(end_time)
@@ -274,7 +267,6 @@ async def case_slice_start_time(message: types.Message, state: FSMContext):
 
 
 @dp.message(StateFormMenuExtra.url)
-@log_debug_function_name
 async def case_url(message: Message, state: FSMContext) -> None:
     url = message.text
     data = await state.get_data()
@@ -329,7 +321,6 @@ async def case_url(message: Message, state: FSMContext) -> None:
 
 
 @dp.channel_post(Command('autodownload'))
-@log_debug_function_name
 async def handler_autodownload_switch_state(message: types.Message) -> None:
     toggle = await autodownload_chat_manager.toggle_chat_state(message.sender_chat.id)
     if toggle:
@@ -339,13 +330,11 @@ async def handler_autodownload_switch_state(message: types.Message) -> None:
 
 
 @dp.message(Command('autodownload'))
-@log_debug_function_name
 async def handler_autodownload_command_in_bot(message: types.Message) -> None:
     await message.answer('<b>❌ This command works only in Channels.</b>\nPlease add this bot to the list of admins and try again.')
 
 
 @dp.callback_query(lambda c: c.data.startswith('download:'))
-@log_debug_function_name
 async def process_callback_button(callback_query: types.CallbackQuery):
     await bot.answer_callback_query(callback_query.id)
 
@@ -371,7 +360,7 @@ def cli_action_parser(text: str):
     attributes_text = text.split(maxsplit=1)[1] if " " in text else ""
 
     matching_attr = next((attr for attr in config.CLI_ACTIVATION_ALL if attr in attributes_text), None)
-    logger.debug(f'🎣 cli_action_parser: {matching_attr}')
+    logger.debug(f'🍔 cli_action_parser: {matching_attr}')
 
     if matching_attr is None:
         return action, attributes
@@ -415,7 +404,6 @@ def cli_action_parser(text: str):
 
 
 @dp.message()
-@log_debug_function_name
 async def handler_message(message: Message):
     cli_action, cli_attributes = cli_action_parser(message.text)
 
@@ -459,7 +447,6 @@ async def handler_message(message: Message):
 
 
 @dp.channel_post()
-@log_debug_function_name
 async def handler_channel_post(message: Message):
     cli_action, cli_attributes = cli_action_parser(message.text)
 
