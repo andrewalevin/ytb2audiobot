@@ -365,15 +365,13 @@ async def process_callback_button(callback_query: types.CallbackQuery):
 
 
 def cli_action_parser(text: str):
-    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
-
     action = ''
     attributes = {}
 
     attributes_text = text.split(maxsplit=1)[1] if " " in text else ""
 
     matching_attr = next((attr for attr in config.CLI_ACTIVATION_ALL if attr in attributes_text), None)
-    logger.debug(f'matching_attr: {matching_attr}')
+    logger.debug(f'🎣 cli_action_parser: {matching_attr}')
 
     if matching_attr is None:
         return action, attributes
@@ -519,7 +517,6 @@ async def handler_channel_post(message: Message):
 
 
 async def run_bot_asynchronously():
-    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
 
     me = await bot.get_me()
     logger.info(f'🚀 Telegram bot: f{me.full_name} https://t.me/{me.username}')
@@ -550,19 +547,15 @@ async def run_bot_asynchronously():
 
 
 def handle_suspend(_signal, _frame):
-    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
-
     """Handle the SIGTSTP signal (Ctrl+Z)."""
-    logger.info("Process suspended. Exiting...")
+    logger.info("🔫 Process suspended. Exiting...")
     # No need to pause manually; the system handles the suspension
     sys.exit(0)
 
 
 def handle_interrupt(_signal, _frame):
-    logger.debug(config.LOG_FORMAT_CALLED_FUNCTION.substitute(fname=inspect.currentframe().f_code.co_name))
-
     """Handle the SIGINT signal (Ctrl+C)."""
-    logger.info("Process interrupted by user. Exiting...")
+    logger.info("🔫 Process interrupted by user. Exiting...")
     sys.exit(0)
 
 
@@ -591,7 +584,7 @@ def main():
         logger.error(f'❌ No {config.ENV_NAME_HASH_SALT} variable set in .env. Make add any random hash with key SALT!')
         return
 
-    logger.info('🗂 data_dir: ' + f'{data_dir.resolve().as_posix()}')
+    logger.info('🗂 Data Dir: ' + f'{data_dir.resolve().as_posix()}')
 
     global bot
     bot = Bot(token=token, default=DefaultBotProperties(parse_mode='HTML'))
@@ -601,7 +594,6 @@ def main():
     try:
         asyncio.run(run_bot_asynchronously())
     except Exception as e:
-        logger.debug()
         logger.error(f'🦀 Error Running asyncio.run: \n{e}')
 
 
