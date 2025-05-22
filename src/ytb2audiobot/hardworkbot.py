@@ -178,7 +178,7 @@ async def job_downloading(
     #logger.info(yt_info)
 
     if yt_info.get('is_live'):
-        await info_message.edit_text('❌🎬💃 This movie is now live and unavailable for download. Try...')
+        logger.info('❌🎬💃 This movie is now live and unavailable for download. Try...')
         #return
 
     if not yt_info.get('title') or not yt_info.get('duration'):
@@ -187,12 +187,13 @@ async def job_downloading(
 
 
     if not yt_info.get('filesize_approx', ''):
-        await info_message.edit_text('❌🛰 This movie is currently live, but it may be in the process of being updated. Try...')
+        logger.info('❌🛰 This movie is currently live, but it may be in the process of being updated. Try...')
         #return
 
     if not any(format_item.get('filesize') is not None for format_item in yt_info.get('formats', [])):
-        await info_message.edit_text('❌🎬🤔 The audio file for this video is unavailable due to an unknown reason. Try...')
+        logger.info('❌🎬🤔 The audio file for this video is unavailable due to an unknown reason. Try...')
         #return
+
 
     action = configurations.get('action', '')
 
