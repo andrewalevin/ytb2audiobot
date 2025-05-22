@@ -31,7 +31,7 @@ jobs:
         python-version: '3.x'
 
     - name: 🐍 🔄 PyPI Upgrade
-      run: python -m pip install --upgrade pip
+      run: python -m pip install --upgrade pip && pip install --upgrade build setuptools wheel twine && pip install -U packaging
 
     - name: 🐍 ⬇️ 🦅 PyPI. VersionHawk Install
       run: pip install versionhawk
