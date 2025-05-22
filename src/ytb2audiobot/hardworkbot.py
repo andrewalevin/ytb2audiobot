@@ -185,6 +185,7 @@ async def job_downloading(
         await info_message.edit_text('❌🎬💔 No title or duration information available for this video. Please try again later.  Exit.')
         return
 
+
     if not yt_info.get('filesize_approx', ''):
         await info_message.edit_text('❌🛰 This movie is currently live, but it may be in the process of being updated. Try...')
         #return
