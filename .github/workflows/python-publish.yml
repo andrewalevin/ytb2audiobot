@@ -46,7 +46,7 @@ jobs:
     # Default 0.0.0.0.0.0.0.0.1 - to have 404 PEP
     - name: 🔫 🔢  Sed Version to PROJECT.TOML
       run: |
-        sed -i "s/0.0.0.0.0.0.0.0.1/${VERSION}/g" pyproject.toml
+        sed -i "s/0.0.0.0.0.0.0.0.1/${VERSION}/g" pyproject.toml && cat pyproject.toml
     
     - name: 🐍 ⬇️ Python. Install dependencies
       run: pip install build
