@@ -175,21 +175,23 @@ async def job_downloading(
         await info_message.edit_text('❌ Unable to extract YT-DLP info for this movie.')
         return
 
+    #logger.info(yt_info)
+
     if yt_info.get('is_live'):
-        await info_message.edit_text('❌🎬💃 This movie is now live and unavailable for download. Please try again later.')
-        return
+        await info_message.edit_text('❌🎬💃 This movie is now live and unavailable for download. Please try again later. Try...')
+        #return
 
     if not yt_info.get('title') or not yt_info.get('duration'):
-        await info_message.edit_text('❌🎬💔 No title or duration information available for this video.')
+        await info_message.edit_text('❌🎬💔 No title or duration information available for this video. Exit.')
         return
 
     if not yt_info.get('filesize_approx', ''):
-        await info_message.edit_text('❌🛰 This movie is currently live, but it may be in the process of being updated. Please try again later.')
-        return
+        await info_message.edit_text('❌🛰 This movie is currently live, but it may be in the process of being updated. Please try again later. Try...')
+        #return
 
     if not any(format_item.get('filesize') is not None for format_item in yt_info.get('formats', [])):
-        await info_message.edit_text('❌🎬🤔 The audio file for this video is unavailable due to an unknown reason.')
-        return
+        await info_message.edit_text('❌🎬🤔 The audio file for this video is unavailable due to an unknown reason. Try...')
+        #return
 
     action = configurations.get('action', '')
 
