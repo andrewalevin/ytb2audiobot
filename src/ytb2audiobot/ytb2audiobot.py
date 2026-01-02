@@ -1,4 +1,4 @@
-import inspect
+
 import logging
 import os
 import argparse
@@ -11,8 +11,6 @@ from importlib.metadata import version
 
 
 from aiogram import Bot, Dispatcher, types, Router
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import default_state, StatesGroup, State
 from aiogram.client.default import DefaultBotProperties
 from aiogram.filters import CommandStart, Command, StateFilter
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -21,15 +19,10 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from ytb2audiobot import config
 from ytb2audiobot.autodownload_chat_manager import AutodownloadChatManager
 from ytb2audiobot.callback_storage_manager import StorageCallbackManager
-from ytb2audiobot.config import DESCRIPTION_BLOCK_SEND_YOUTUBE_LINK_TEXT, DESCRIPTION_BLOCK_EXTRA_OPTIONS, \
-    DESCRIPTION_BLOCK_OKAY_AFTER_EXIT, SPLIT_DURATION_VALUES_ROW_1, \
-    SPLIT_DURATION_VALUES_ROW_2, SPLIT_DURATION_VALUES_ROW_3, SPLIT_DURATION_VALUES_ROW_4, BITRATE_VALUES_ROW_ONE, \
-    BITRATE_VALUES_ROW_TWO, SPLIT_DURATION_VALUES_ALL, BITRATE_VALUES_ALL, START_AND_HELP_TEXT, \
-    TEXT_SAY_HELLO_BOT_OWNER_AT_STARTUP
+from ytb2audiobot.config import START_AND_HELP_TEXT, TEXT_SAY_HELLO_BOT_OWNER_AT_STARTUP
 from ytb2audiobot.cron import run_periodically, empty_data_dir_by_cron
 from ytb2audiobot.hardworkbot import job_downloading, make_subtitles
 from ytb2audiobot.logger import logger
-from ytb2audiobot.slice import time_hhmmss_check_and_convert
 from ytb2audiobot.utils import remove_all_in_dir, get_data_dir, get_big_youtube_move_id, create_inline_keyboard
 from ytb2audiobot.cron import update_pip_package_ytdlp
 
@@ -44,17 +37,6 @@ data_dir = get_data_dir()
 callback_storage_manager = StorageCallbackManager()
 
 autodownload_chat_manager = AutodownloadChatManager(path=config.AUTO_DOWNLOAD_CHAT_IDS_STORAGE_FILENAME)
-
-class StateFormMenuExtra(StatesGroup):
-    options = State()
-    split_by_duration = State()
-    bitrate = State()
-    subtitles_options = State()
-    subtitles_search_word = State()
-    slice_start_time = State()
-    slice_end_time = State()
-    url = State()
-    translate = State()
 
 
 def log_debug_function_name(func):
@@ -77,249 +59,8 @@ async def handler_command_start_and_help(message: Message) -> None:
 
 
 @dp.message(Command('cli'))
-
-
-
 async def handler_command_cli_info(message: Message) -> None:
     await message.answer(text=config.DESCRIPTION_BLOCK_CLI , parse_mode='HTML')
-
-
-TG_EXTRA_OPTIONS_LIST = ['extra', 'options', 'advanced', 'ext', 'ex', 'opt', 'op', 'adv', 'ad']
-@dp.channel_post(Command(commands=TG_EXTRA_OPTIONS_LIST))
-async def handler_extra_options_except_channel_post(message: Message) -> None:
-    await message.answer('❌ This command works only in the bot, not in channels.')
-
-
-@dp.message(Command(commands=TG_EXTRA_OPTIONS_LIST), StateFilter(default_state))
-async def case_show_options(message: types.Message, state: FSMContext):
-    await state.set_state(StateFormMenuExtra.options)
-    await bot.send_message(
-        chat_id=message.from_user.id,
-        reply_to_message_id=None,
-        text=f'{DESCRIPTION_BLOCK_EXTRA_OPTIONS}\n\nSelect one of the option:',
-        parse_mode='HTML',
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [
-                InlineKeyboardButton(text='✂️ By duration', callback_data=config.ACTION_NAME_SPLIT_BY_DURATION),
-                InlineKeyboardButton(text='⏱️️ By timecodes', callback_data=config.ACTION_NAME_SPLIT_BY_TIMECODES)],
-            [
-                InlineKeyboardButton(text='🎸 Set bitrate', callback_data=config.ACTION_NAME_BITRATE_CHANGE),
-                InlineKeyboardButton(text='✏️ Get subtitles', callback_data=config.ACTION_NAME_SUBTITLES_SHOW_OPTIONS)],
-            [
-                InlineKeyboardButton(text='🍰 Get slice', callback_data=config.ACTION_NAME_SLICE),
-                InlineKeyboardButton(text='🌎 Translate', callback_data=config.ACTION_NAME_TRANSLATE)],
-            [
-                InlineKeyboardButton(text='Close', callback_data=config.ACTION_NAME_OPTIONS_EXIT)],]))
-
-
-@dp.callback_query(StateFormMenuExtra.options)
-async def case_options(callback_query: types.CallbackQuery, state: FSMContext):
-    action = callback_query.data
-    if action == config.ACTION_NAME_SPLIT_BY_DURATION:
-        await state.update_data(action=action)
-        await state.set_state(StateFormMenuExtra.split_by_duration)
-        await bot.edit_message_text(
-            chat_id=callback_query.from_user.id,
-            message_id=callback_query.message.message_id,
-            text=config.DESCRIPTION_BLOCK_SPLIT_BY_DURATION,
-            reply_markup=create_inline_keyboard([
-                SPLIT_DURATION_VALUES_ROW_1,
-                SPLIT_DURATION_VALUES_ROW_2,
-                SPLIT_DURATION_VALUES_ROW_3,
-                SPLIT_DURATION_VALUES_ROW_4]))
-
-    elif action == config.ACTION_NAME_SPLIT_BY_TIMECODES:
-        await state.update_data(action=action)
-        await bot.edit_message_text(
-            chat_id=callback_query.from_user.id,
-            message_id=callback_query.message.message_id,
-            text=DESCRIPTION_BLOCK_SEND_YOUTUBE_LINK_TEXT)
-        await state.set_state(StateFormMenuExtra.url)
-
-    elif action == config.ACTION_NAME_BITRATE_CHANGE:
-        await state.update_data(action=action)
-        await bot.edit_message_text(
-            chat_id=callback_query.from_user.id,
-            message_id=callback_query.message.message_id,
-            text=config.DESCRIPTION_BLOCK_BITRATE,
-            reply_markup=create_inline_keyboard([
-                BITRATE_VALUES_ROW_ONE,
-                BITRATE_VALUES_ROW_TWO]))
-        await state.set_state(StateFormMenuExtra.bitrate)
-
-    elif action == config.ACTION_NAME_SUBTITLES_SHOW_OPTIONS:
-        await state.update_data(action=action)
-        await bot.edit_message_text(
-            chat_id=callback_query.from_user.id,
-            message_id=callback_query.message.message_id,
-            text=config.DESCRIPTION_BLOCK_SUBTITLES,
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
-                InlineKeyboardButton(text='🔮 Retrieve All', callback_data=config.ACTION_NAME_SUBTITLES_GET_ALL),
-                InlineKeyboardButton(text='🔍 Search by Word', callback_data=config.ACTION_NAME_SUBTITLES_SEARCH_WORD)]]))
-        await state.set_state(StateFormMenuExtra.subtitles_options)
-
-    elif action == config.ACTION_NAME_SLICE:
-        await state.update_data(action=action)
-        await bot.edit_message_text(
-            chat_id=callback_query.from_user.id,
-            message_id=callback_query.message.message_id,
-            text=config.DESCRIPTION_BLOCK_SLICE_PART_ONE)
-        await state.set_state(StateFormMenuExtra.slice_start_time)
-
-    elif action == config.ACTION_NAME_TRANSLATE:
-        await state.update_data(action=action)
-        await bot.edit_message_text(
-            chat_id=callback_query.from_user.id,
-            message_id=callback_query.message.message_id,
-            text=DESCRIPTION_BLOCK_SEND_YOUTUBE_LINK_TEXT)
-        await state.set_state(StateFormMenuExtra.url)
-
-    elif action == config.ACTION_NAME_OPTIONS_EXIT:
-        await state.clear()
-        await bot.edit_message_text(
-            chat_id=callback_query.from_user.id,
-            message_id=callback_query.message.message_id,
-            text=DESCRIPTION_BLOCK_OKAY_AFTER_EXIT)
-
-
-@dp.callback_query(StateFormMenuExtra.split_by_duration)
-async def case_split_by_duration_processing(callback_query: types.CallbackQuery, state: FSMContext):
-    split_duration = callback_query.data
-    if split_duration not in SPLIT_DURATION_VALUES_ALL:
-        await bot.edit_message_text(f'<b>❌ An unexpected or invalid split duration value was received.</b>\n(split_duration={split_duration})')
-        await state.clear()
-
-    await state.update_data(split_duration=split_duration)
-    await bot.edit_message_text(
-        chat_id=callback_query.from_user.id, message_id=callback_query.message.message_id,
-        text=DESCRIPTION_BLOCK_SEND_YOUTUBE_LINK_TEXT)
-    await state.set_state(StateFormMenuExtra.url)
-
-
-@dp.callback_query(StateFormMenuExtra.bitrate)
-async def case_bitrate_processing(callback_query: types.CallbackQuery, state: FSMContext):
-    bitrate = callback_query.data
-    if bitrate not in BITRATE_VALUES_ALL:
-        await bot.edit_message_text(f'<b>❌ An unexpected or invalid bitrate value was received.</b>\n(bitrate={bitrate})')
-        await state.clear()
-
-    await state.update_data(bitrate=bitrate)
-    await bot.edit_message_text(
-        chat_id=callback_query.from_user.id, message_id=callback_query.message.message_id,
-        text=DESCRIPTION_BLOCK_SEND_YOUTUBE_LINK_TEXT)
-    await state.set_state(StateFormMenuExtra.url)
-
-
-@dp.callback_query(StateFormMenuExtra.subtitles_options)
-async def case_subtitles_options_processing(callback_query: types.CallbackQuery, state: FSMContext):
-    action = callback_query.data
-    if action == config.ACTION_NAME_SUBTITLES_GET_ALL:
-        await state.update_data(action=action)
-        await bot.edit_message_text(
-            chat_id=callback_query.from_user.id, message_id=callback_query.message.message_id,
-            text=DESCRIPTION_BLOCK_SEND_YOUTUBE_LINK_TEXT)
-        await state.set_state(StateFormMenuExtra.url)
-
-    elif action == config.ACTION_NAME_SUBTITLES_SEARCH_WORD:
-        await state.update_data(action=action)
-        await bot.edit_message_text(
-            chat_id=callback_query.from_user.id, message_id=callback_query.message.message_id,
-            text=f"🔍 Enter the word to search for in subtitles:")
-        await state.set_state(StateFormMenuExtra.subtitles_search_word)
-
-
-@dp.message(StateFormMenuExtra.subtitles_search_word)
-async def case_subtitles_search_word(message: types.Message, state: FSMContext):
-    subtitles_search_word = message.text
-    await state.update_data(subtitles_search_word=subtitles_search_word)
-    await message.answer(text=DESCRIPTION_BLOCK_SEND_YOUTUBE_LINK_TEXT)
-    await state.set_state(StateFormMenuExtra.url)
-
-
-@dp.message(StateFormMenuExtra.slice_start_time)
-async def case_slice_start_time(message: types.Message, state: FSMContext):
-    start_time = message.text
-    start_time = time_hhmmss_check_and_convert(start_time)
-    if start_time is None:
-        await state.clear()
-        await message.answer(f'❌ Invalid time format. Please try again.')
-
-    await state.update_data(slice_start_time=start_time)
-    await message.answer(config.DESCRIPTION_BLOCK_SLICE_PART_TWO)
-    await state.set_state(StateFormMenuExtra.slice_end_time)
-
-
-@dp.message(StateFormMenuExtra.slice_end_time)
-async def case_slice_start_time(message: types.Message, state: FSMContext):
-    end_time = message.text
-    end_time = time_hhmmss_check_and_convert(end_time)
-    if end_time is None:
-        await state.clear()
-        await message.answer(f'❌ Invalid time format. Please try again.')
-
-    data = await state.get_data()
-    start_time = int(data.get('slice_start_time', ''))
-    if start_time >= end_time:
-        await state.clear()
-        await message.answer(f'❌ Start time must be earlier than the end time. Please try again.')
-
-    await state.update_data(slice_end_time=end_time)
-    await message.answer(text=DESCRIPTION_BLOCK_SEND_YOUTUBE_LINK_TEXT)
-    await state.set_state(StateFormMenuExtra.url)
-
-
-@dp.message(StateFormMenuExtra.url)
-async def case_url(message: Message, state: FSMContext) -> None:
-    url = message.text
-    data = await state.get_data()
-    await state.clear()
-
-    if not get_big_youtube_move_id(url):
-        await message.answer(f'<b>❌ Unable to extract a valid YouTube URL from your input.</b>\n(url={url})')
-        return
-
-    action = data.get('action', '')
-
-    if action == config.ACTION_NAME_SUBTITLES_GET_ALL:
-        await make_subtitles(
-            bot=bot, sender_id=message.from_user.id, url=url, reply_message_id=message.message_id)
-
-    elif action == config.ACTION_NAME_SUBTITLES_SEARCH_WORD:
-        if word := data.get('subtitles_search_word', ''):
-            await make_subtitles(
-                bot=bot, sender_id=message.from_user.id, url=url, word=word, reply_message_id=message.message_id)
-
-    elif action == config.ACTION_NAME_SPLIT_BY_DURATION:
-        split_duration = data.get('split_duration', '')
-        await job_downloading(
-            bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id, message_text=url,
-            info_message_id=None, configurations={'action': action, 'split_duration_minutes': split_duration})
-
-    elif action == config.ACTION_NAME_SPLIT_BY_TIMECODES:
-        await job_downloading(
-            bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id, message_text=url,
-            info_message_id=None, configurations={'action': action})
-
-    elif action == config.ACTION_NAME_BITRATE_CHANGE:
-        bitrate = data.get('bitrate', '')
-
-        await job_downloading(
-            bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id, message_text=url,
-            info_message_id=None, configurations={'action': action, 'bitrate': bitrate})
-
-    elif action == config.ACTION_NAME_SLICE:
-        slice_start_time = data.get('slice_start_time', '')
-        slice_end_time = data.get('slice_end_time', '')
-
-        await job_downloading(
-            bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id, message_text=url,
-            info_message_id=None, configurations={
-                'action': action, 'slice_start_time': slice_start_time, 'slice_end_time': slice_end_time})
-
-    elif action == config.ACTION_NAME_TRANSLATE:
-        await job_downloading(
-            bot=bot, sender_id=message.from_user.id, reply_to_message_id=message.message_id, message_text=url,
-            info_message_id=None, configurations={'action': action})
 
 
 @dp.channel_post(Command('autodownload'))
@@ -334,25 +75,6 @@ async def handler_autodownload_switch_state(message: types.Message) -> None:
 @dp.message(Command('autodownload'))
 async def handler_autodownload_command_in_bot(message: types.Message) -> None:
     await message.answer('<b>❌ This command works only in Channels.</b>\nPlease add this bot to the list of admins and try again.')
-
-
-@dp.callback_query(lambda c: c.data.startswith('download:'))
-async def process_callback_button(callback_query: types.CallbackQuery):
-    await bot.answer_callback_query(callback_query.id)
-
-    # Remove this key from list of callbacks
-    callback_storage_manager.remove_key(key=callback_query.data)
-
-    callback_parts = callback_query.data.split(':_:')
-    sender_id = int(callback_parts[1])
-    message_id = int(callback_parts[2])
-    movie_id = callback_parts[3]
-
-    info_message_id = callback_query.message.message_id
-
-    await job_downloading(
-        bot=bot, sender_id=sender_id, reply_to_message_id=message_id, message_text=f'youtu.be/{movie_id}',
-        info_message_id=info_message_id)
 
 
 def cli_action_parser(text: str):

@@ -206,7 +206,7 @@ async def download_audio_from_download(
 
     url = get_short_youtube_url_with_http(movie_id)
     command = f'yt-dlp {options} --output "{output_path.as_posix()}" {url}'
-
+    logger.info(f'🪭 Download command: {command}')
     stdout, stderr, return_code = await run_command(command)
 
     if stdout:
@@ -215,6 +215,7 @@ async def download_audio_from_download(
     if stderr:
         for line in stderr.splitlines():
             logger.error(f'📣 {line}')
+
 
     # Check for errors or missing file
     if return_code != 0:

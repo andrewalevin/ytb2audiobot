@@ -9,6 +9,7 @@ from string import Template
 
 import yt_dlp
 from aiogram import Bot
+from aiogram.exceptions import TelegramNetworkError
 from aiogram.types import FSInputFile, BufferedInputFile, Message
 from ytbtimecodes.timecodes import extract_timecodes, timedelta_from_seconds, standardize_time_format
 
@@ -416,14 +417,17 @@ async def job_downloading(
             segment_duration=config.SEGMENT_AUDIO_DURATION_SEC)
 
     segments = add_paddings_to_segments(segments, config.SEGMENT_DURATION_PADDING_SEC)
+    logger.info(f'🎛 Segments. Add Paddings: {segments}')
 
     audio_file_size = await get_file_size(audio_path)
 
     max_segment_duration = int(0.89 * duration * config.TELEGRAM_MAX_FILE_SIZE_BYTES / audio_file_size)
 
     segments = make_magic_tail(segments, max_segment_duration)
+    logger.info(f'🦖 Segments. Make Magic Tail: {segments}')
 
     segments = segments_verification(segments, max_segment_duration)
+    logger.info(f'🌈 Segments. Verification: {segments}')
 
     # Check Rebalance by Timecodes
     if SEGMENT_REBALANCE_TO_FIT_TIMECODES:
@@ -435,10 +439,14 @@ async def job_downloading(
 
         segments = add_paddings_to_segments(segments, config.SEGMENT_DURATION_PADDING_SEC)
 
+        logger.info(f'🎭 Segments. Rebalanced Fit Timecodes: {segments}')
+
     if not segments:
         logger.error(f'❌ {mid} No audio segments found after processing. This could be an internal error.')
         await info_message.edit_text(f'❌ Error: No audio segments found after processing. This could be an internal error.')
         return
+
+
 
     try:
         segments = await make_split_audio_second(audio_path, segments)
@@ -450,9 +458,12 @@ async def job_downloading(
         await info_message.edit_text(f'❌ Error: No audio segments found after processing.')
         return
 
+    logger.info(f'🎰 Segments. Make Split: {segments}')
+
     await info_message.edit_text('⌛🚀 Uploading to Telegram…')
+
     for idx, segment in enumerate(segments):
-        logger.info(f'💚 {mid} Uploading audio file: {segment.get("audio_path")}')
+        logger.info(f'💚 {mid} [{idx} of {len(segments)}] Uploading audio file: {segment.get("path")}')
         segment_start = segment.get('start')
         segment_end = segment.get('end')
         filtered_timecodes_dict = filter_timecodes_within_bounds(
@@ -482,16 +493,50 @@ async def job_downloading(
         fname_title_size = config.TG_MAX_FILENAME_LEN - len(fname_prefix) - len(fname_suffix)
         fname_title = title[:fname_title_size]+'-' if fname_title_size > 6 else ''
 
-        await bot.send_audio(
-            chat_id=sender_id,
-            audio=FSInputFile(
-                path=segment.get('path'),
-                filename=fname_prefix + fname_title + fname_suffix),
-            duration=duration,
-            thumbnail=FSInputFile(path=thumbnail_path) if thumbnail_path is not None else None,
-            caption=caption_output if len(caption_output) < config.TELEGRAM_MAX_CAPTION_TEXT_SIZE else trim_caption_to_telegram_send(caption_output),
-            reply_to_message_id=reply_output,
-            parse_mode='HTML')
+        _MAX_ATTEMPTS = 4
+        for attempt in range(_MAX_ATTEMPTS):
+            try:
+                logger.info(
+                    "Sending audio (%s), attempt %d/%d",
+                    segment.get('path'),
+                    attempt + 1,
+                    _MAX_ATTEMPTS
+                )
+
+                await bot.send_audio(
+                    chat_id=sender_id,
+                    audio=FSInputFile(
+                        path=segment.get('path'),
+                        filename=fname_prefix + fname_title + fname_suffix
+                    ),
+                    duration=duration,
+                    thumbnail=FSInputFile(path=thumbnail_path) if thumbnail_path is not None else None,
+                    caption=(
+                        caption_output
+                        if len(caption_output) < config.TELEGRAM_MAX_CAPTION_TEXT_SIZE
+                        else trim_caption_to_telegram_send(caption_output)
+                    ),
+                    reply_to_message_id=reply_output,
+                    parse_mode='HTML',
+                    request_timeout=600
+                )
+
+                logger.info("Audio sent successfully")
+                break
+
+            except TelegramNetworkError as e:
+                logger.warning(
+                    "TelegramNetworkError on attempt %d/%d: %s",
+                    attempt + 1,
+                    _MAX_ATTEMPTS,
+                    e
+                )
+
+                if attempt == _MAX_ATTEMPTS - 1:
+                    logger.error("All attempts to send audio failed")
+                    raise
+
+                await asyncio.sleep(2 * (attempt + 1))  # backoff
 
         reply_output = None
 
