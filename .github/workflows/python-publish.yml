@@ -36,6 +36,10 @@ jobs:
     - name: 🐍 ⬇️ 🦅 PyPI. VersionHawk Install
       run: pip install versionhawk
 
+    # 3️⃣ Устанавливаем hatch и twine
+    - name: Install build tools
+      run: pip install --upgrade hatch twine
+
     #- name: 🕰️ 🔢 Version DateTimeStamp
     #  run: echo "VERSION=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_ENV
 
@@ -44,15 +48,27 @@ jobs:
         echo "VERSION=$(versionhawk ${PROJECT_NAME})" >> $GITHUB_ENV
 
     # Default 0.0.0.0.0.0.0.0.1 - to have 404 PEP
-    - name: 🔫 🔢  Sed Version to PROJECT.TOML
-      run: |
-        sed -i "s/0.0.0.0.0.0.0.0.1/${VERSION}/g" pyproject.toml && cat pyproject.toml
+    #- name: 🔫 🔢  Sed Version to PROJECT.TOML
+    #  run: |
+    #    sed -i "s/0.0.0.0.0.0.0.0.1/${VERSION}/g" pyproject.toml && cat pyproject.toml
     
     - name: 🐍 ⬇️ Python. Install dependencies
       run: pip install build
 
     - name: 🐍 🏗️ Python. Build package
       run: python -m build
+
+    # 4️⃣ Проверяем версию (по желанию)
+    - name: Show version
+      run: echo $VERSION
+
+    # 5️⃣ Сборка wheel и sdist
+    - name: Build package
+      run: hatch build
+
+    # 6️⃣ Проверка метаданных wheel
+    - name: Check built distributions
+      run: twine check dist/*
 
     - name: 😺 💾 🚀 Github. Create GitHub Release
       id: create_release
