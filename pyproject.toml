@@ -6,8 +6,7 @@ build-backend = "setuptools.build_meta"  # If not defined, then legacy behavior 
 [project]
 name = "ytb2audiobot"
 
-#version = "0.0.0.0.0.0.0.0.1"
-version = "2025.5"
+version = "0.0.0.0.0.0.0.0.1"
 
 
 description = "🦜 Youtube to Audio by Andrew A Levin"
