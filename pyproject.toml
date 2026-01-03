@@ -1,39 +1,29 @@
-
 [build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"  # If not defined, then legacy behavior can happen.
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "ytb2audiobot"
-
-version = "0.0.0.0.0.0.0.0.1"
-
-
+dynamic = ["version"]
 description = "🦜 Youtube to Audio by Andrew A Levin"
 readme = "README.md"
 license = { file = "LICENSE.txt" }
 requires-python = ">=3.8"
-
-
-
-keywords = ['ytb2audio']
+keywords = ["ytb2audio"]
 
 authors = [
-  {name = "Andrew Levin", email = "author@example.com" }
+  { name = "Andrew Levin", email = "author@example.com" }
 ]
 
 maintainers = [
-  {name = "A. Great Maintainer", email = "maintainer@example.com" }
+  { name = "A. Great Maintainer", email = "maintainer@example.com" }
 ]
 
 classifiers = [
   "Development Status :: 3 - Alpha",
-
   "Intended Audience :: Developers",
   "Topic :: Software Development :: Build Tools",
-
   "License :: OSI Approved :: MIT License",
-
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
@@ -44,37 +34,40 @@ classifiers = [
 ]
 
 dependencies = [
-  'ytb2audio',
-  'audio2splitted',
-  'aiogram',
-  'pytube',
-  'youtube-transcript-api',
-  'pyyaml',
-  'aiofiles',
-  'urlextract',
-  'ytbtimecodes>=1.3',
-  'yt-dlp',
-  'ytb2subtitles'
+  "ytb2audio",
+  "audio2splitted",
+  "aiogram",
+  "pytube",
+  "youtube-transcript-api",
+  "pyyaml",
+  "aiofiles",
+  "urlextract",
+  "ytbtimecodes>=1.3",
+  "yt-dlp",
+  "ytb2subtitles"
 ]
-
 
 [project.optional-dependencies]
 dev = ["check-manifest"]
 test = ["coverage"]
 
 [project.urls]
-"Homepage" = "https://github.com/andrewalevin"
-"Bug Reports" = "https://github.com/andrewalevin"
-"Funding" = "https://donate.pypi.org"
-"Say Thanks!" = "https://github.com/andrewalevin"
-"Source" = "https://github.com/andrewalevin"
+Homepage = "https://github.com/andrewalevin"
+Bug_Reports = "https://github.com/andrewalevin"
+Funding = "https://donate.pypi.org"
+Say_Thanks = "https://github.com/andrewalevin"
+Source = "https://github.com/andrewalevin"
 
 [project.scripts]
 ytb2audiobot = "ytb2audiobot.ytb2audiobot:main"
 
-[tool.setuptools]
-package-data = {"sample" = ["*.dat", "js_scripts/*.js"]}
+[tool.hatch.version]
+source = "env"
+variable = "VERSION"
+default = "0.0.0"
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/ytb2audiobot"]
 
+[tool.hatch.build.targets.sdist]
+include = ["src/ytb2audiobot", "README.md", "LICENSE.txt"]
